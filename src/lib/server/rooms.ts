@@ -31,7 +31,7 @@ import {
   zincr,
   ztop,
 } from "./store";
-import { findMatch } from "./live";
+import { findMatch, scoreLine } from "./live";
 import { BOT_AVATARS, BOT_NAMES, botCall, botLine } from "./bots";
 
 type ReplayBall = {
@@ -55,6 +55,8 @@ const K = {
   streak: (id: string) => `room:${id}:streak`,
   result: (id: string) => `room:${id}:last`,
   huddle: (id: string) => `room:${id}:huddle`,
+  score: (id: string) => `room:${id}:score`,
+  scoreLease: (id: string) => `room:${id}:scorelease`,
   replay: (id: string) => `room:${id}:replay`,
   tickLease: (id: string) => `room:${id}:tick`,
   hostLease: (id: string) => `room:${id}:hostop`,
@@ -398,6 +400,29 @@ export async function setHuddle(room: RoomPublic, h: HuddleInfo) {
   if (h) await setJSON(K.huddle(room.id), h, 60 * 60 * 6);
   else await setJSON(K.huddle(room.id), null, 60);
   await sendToRoom(room.channelId, MT.Huddle, { huddle: h }, { priority: 2, persist: false });
+}
+
+/**
+ * Live score push. If this room follows a real match, check the feed at most
+ * once per 25 s (lease), and only when the score has changed write it into the
+ * open channel's metadata. Nexconn then pushes it to every phone in the room
+ * (onMetadataChanged), so nobody polls for the score.
+ */
+export async function syncScore(room: RoomPublic) {
+  if (!room.match) return { changed: false, reason: "no match" };
+  if (!(await lease(K.scoreLease(room.id), 25_000))) return { changed: false, reason: "fresh" };
+  const m = await findMatch(room.match.sport, room.match.id);
+  if (!m) return { changed: false, reason: "not in feed" };
+  const packed = JSON.stringify({
+    s: m.status,
+    d: (m.detail || m.statusText).slice(0, 140),
+    t: m.teams.map((t) => [t.abbr, t.score, t.logo]),
+  });
+  const prev = await getJSON<string>(K.score(room.id));
+  if (prev === packed) return { changed: false, reason: "same" };
+  await setJSON(K.score(room.id), packed, 60 * 60 * 24);
+  const r = await setRoomMetadata(room.channelId, { live: packed, score: scoreLine(m) });
+  return { changed: true, ms: r.ms, line: scoreLine(m) };
 }
 
 export async function getHuddle(roomId: string) {

@@ -27,7 +27,7 @@ const NEXCONN_XI = [
   { k: "Custom message types", pos: "CB", art: "b2/check", x: 62, y: 72, d: "CI:Moment, CI:Lock, CI:Pending and CI:Result game cards, registered before connect." },
   { k: "High-priority messages", pos: "RB", art: "b2/megaphone", x: 84, y: 68, d: "Lock and result cards go out at priority 2, so they cut through a busy chat." },
   { k: "Status messages", pos: "CM", art: "b2/foam-finger", x: 28, y: 47, d: "Live tallies and sticker reactions travel as status messages: instant, never stored." },
-  { k: "Channel metadata", pos: "CM", art: "b2/replay", x: 50, y: 50, d: "Room phase and score mirrored into open-channel metadata, so a late joiner catches up at once." },
+  { k: "Channel metadata", pos: "CM", art: "b2/replay", x: 50, y: 50, d: "The real match score is written into open-channel metadata only when it changes, and Nexconn pushes it to every phone in the room. No polling. Late joiners get it on entry." },
   { k: "Participant events", pos: "CM", art: "c1/student", x: 72, y: 47, d: "onParticipantChanged powers the live head count on the scoreboard." },
   { k: "Pre-messaging webhook", pos: "LW", art: "b2/cross", x: 20, y: 24, d: "open_channel:pre_messaging refuses betting spam, links, phone numbers and forged result cards before delivery ({pass: 0})." },
   { k: "Mute + message delete", pos: "ST", art: "b1/whistle", x: 50, y: 18, d: "The host mutes a participant; the message:send webhook deletes anything that slips through." },

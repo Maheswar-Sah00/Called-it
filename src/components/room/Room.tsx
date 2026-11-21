@@ -61,6 +61,8 @@ export function Room({ id }: { id: string }) {
   const [myCalls, setMyCalls] = useState<Record<string, string>>({});
   const [results, setResults] = useState<ResultCard[]>([]);
   const [stats, setStats] = useState({ cards: 0, chats: 0, forged: 0, blocked: 0 });
+  /** live score pushed by Nexconn channel metadata (beats the polled copy) */
+  const [pushed, setPushed] = useState<{ s: string; d: string; t: [string, string, string][]; at: number } | null>(null);
   const offset = useRef(0);
   const liveRef = useRef<Live | null>(null);
   const shownMid = useRef<string | null>(null);
@@ -100,6 +102,16 @@ export function Room({ id }: { id: string }) {
     const t = setInterval(fetchState, liveStatus === "live" ? 5000 : 1500);
     return () => clearInterval(t);
   }, [fetchState, liveStatus]);
+
+  // real-match rooms: nudge the server to check the feed; any change arrives as a metadata push
+  const followsMatch = !!st?.room.match;
+  useEffect(() => {
+    if (!followsMatch) return;
+    const nudge = () => void api(`/api/rooms/${id}/score`, {});
+    nudge();
+    const t = setInterval(nudge, 30_000);
+    return () => clearInterval(t);
+  }, [followsMatch, id]);
 
   // replay driver: nudge the server at its own deadline
   useEffect(() => {
@@ -142,6 +154,14 @@ export function Room({ id }: { id: string }) {
           setChat((c) => c.filter((l) => !e.ids.includes(l.id)));
           break;
         case "metadata":
+          if (e.data.live) {
+            try {
+              const v = JSON.parse(e.data.live) as { s: string; d: string; t: [string, string, string][] };
+              setPushed({ ...v, at: Date.now() });
+            } catch {
+              /* ignore a malformed value */
+            }
+          }
           break;
         case "msg": {
           const m = e.msg;
@@ -354,6 +374,14 @@ export function Room({ id }: { id: string }) {
 
   const room = st?.room;
   const sport = room?.sport ?? "cricket";
+  const liveView =
+    room?.match && sport !== "f1"
+      ? pushed
+        ? { status: pushed.s, detail: pushed.d, teams: pushed.t.map(([abbr, score, logo]) => ({ abbr, score, logo })) }
+        : st?.live
+          ? { status: st.live.status, detail: st.live.detail || st.live.statusText, teams: st.live.teams.map((t) => ({ abbr: t.abbr, score: t.score, logo: t.logo })) }
+          : null
+      : null;
   const open = phase === "open" && !clientLocked;
   const bolo =
     phase === "waiting"
@@ -421,11 +449,11 @@ export function Room({ id }: { id: string }) {
               </div>
             </div>
             <div className="min-w-0 text-left sm:text-center">
-              {st?.live && st.live.teams.length === 2 && st.live.sport !== "f1" ? (
+              {liveView && liveView.teams.length === 2 ? (
                 <>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:justify-center">
-                    {st.live.teams.map((t, i) => (
-                      <span key={t.name} className="flex items-center gap-2">
+                  <div key={pushed?.at ?? 0} className={`flex flex-wrap items-center gap-x-4 gap-y-1 sm:justify-center ${pushed ? "pop-in" : ""}`} style={{ animationDuration: "0.35s" }}>
+                    {liveView.teams.map((t, i) => (
+                      <span key={t.abbr + i} className="flex items-center gap-2">
                         {i === 1 && <span className="font-led text-2xl text-paper/40">v</span>}
                         {t.logo && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -438,8 +466,9 @@ export function Room({ id }: { id: string }) {
                     ))}
                   </div>
                   <p className="font-led mt-1 truncate text-lg text-paper/60">
-                    {st.live.status === "live" ? "● LIVE · " : ""}
-                    {(st.live.detail || st.live.statusText).toUpperCase()}
+                    {liveView.status === "live" ? "● LIVE · " : ""}
+                    {liveView.detail.toUpperCase()}
+                    {pushed && <span className="text-paper/40"> · PUSHED BY NEXCONN</span>}
                   </p>
                 </>
               ) : (
