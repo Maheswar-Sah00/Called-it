@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/Theme";
 /** Judge demo: one tap → a replay room of the 2024 T20 World Cup final with labelled bots. */
 export default function Try() {
   const router = useRouter();
-  const { info, join } = useSession();
+  const { info, join, error: sessionError } = useSession();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const started = useRef(false);
@@ -40,12 +40,19 @@ export default function Try() {
         <Brand />
         <ThemeToggle />
       </div>
-      <div className="relative z-10 mx-auto grid max-w-5xl items-center gap-8 px-4 pb-40 pt-6 md:grid-cols-2 md:gap-10 md:pt-10">
+      {/* phones: say what this is before the card */}
+      <div className="relative z-10 mx-auto max-w-5xl px-4 pt-4 md:hidden">
+        <p className="font-led text-lg leading-tight text-orange">REPLAY · T20 WORLD CUP FINAL 2024</p>
+        <h1 className="font-display mt-1 text-[1.7rem] font-extrabold leading-tight">The 60-second demo</h1>
+        <p className="mt-1 text-sm text-on-muted">South Africa need 30 off 30. Call every ball before it&apos;s bowled.</p>
+      </div>
+      <div className="relative z-10 mx-auto grid max-w-5xl items-center gap-8 px-4 pb-40 pt-4 md:grid-cols-2 md:gap-10 md:pt-10">
         <div>
-          <p className="font-led text-2xl text-orange">REPLAY · T20 WORLD CUP FINAL 2024</p>
-          <Wordmark size="text-5xl sm:text-7xl" className="mt-2" />
-          <h1 className="font-display mt-6 text-3xl font-extrabold ">The 60-second demo</h1>
-          <p className="mt-3 text-on-muted">
+          <p className="font-led text-2xl text-orange max-md:hidden">REPLAY · T20 WORLD CUP FINAL 2024</p>
+          <Wordmark size="text-5xl sm:text-7xl" className="mt-2 max-md:hidden" />
+          <h1 className="font-display mt-6 text-3xl font-extrabold max-md:hidden">The 60-second demo</h1>
+          <p className="font-display text-xl font-extrabold md:hidden">How it plays</p>
+          <p className="mt-3 text-on-muted max-md:text-sm">
             Replay the last five overs of the <b>2024 T20 World Cup final</b>, ball by ball, from real Cricsheet data. South Africa
             need 30 off 30. Call every ball before it&apos;s bowled. Five demo friends (marked BOT) call with you.
           </p>
@@ -61,10 +68,10 @@ export default function Try() {
             ))}
           </ul>
         </div>
-        <div className="brut-lg rounded-3xl bg-paper p-6 text-ink max-md:order-first">
-          {info === null || busy || info.session ? (
-            <div className="grid place-items-center py-10 text-center">
-              <Art src="b4/cricket" className="floaty w-40" />
+        <div className="brut-lg rounded-3xl bg-paper p-5 text-ink max-md:order-first sm:p-6">
+          {(info === null && !sessionError) || busy || info?.session ? (
+            <div className="grid place-items-center py-6 text-center sm:py-10">
+              <Art src="b4/cricket" className="floaty w-28 sm:w-40" />
               <p className="font-display mt-4 text-xl font-extrabold">{err ?? "Walking out to the middle…"}</p>
               {err && (
                 <button className="key mt-4" onClick={() => go()}>

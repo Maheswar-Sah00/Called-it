@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SPORT_ART, SPORT_LABEL, type LiveMatch, type Sport } from "@/lib/game";
 import { Art, Brand, Faq, Pitch, Wordmark } from "@/components/ui";
 import { StartRoom } from "@/components/StartRoom";
@@ -47,8 +47,23 @@ export default function Home() {
   const [open, setOpen] = useState(false);
   const [sport, setSport] = useState<Sport | undefined>();
   const [match, setMatch] = useState<LiveMatch | null>(null);
+  const [allXI, setAllXI] = useState(false);
   const featured = useLive("all");
   const liveNow = (featured ?? []).filter((m) => m.status === "live");
+  // phone thumb bar: only while none of hero, match list or footer (each has its own CTA) is on screen
+  const heroRef = useRef<HTMLElement>(null);
+  const liveRef = useRef<HTMLElement>(null);
+  const footRef = useRef<HTMLElement>(null);
+  const [barOn, setBarOn] = useState(false);
+  useEffect(() => {
+    const seen = new Map<Element, boolean>();
+    const io = new IntersectionObserver((es) => {
+      es.forEach((e) => seen.set(e.target, e.isIntersecting));
+      setBarOn(![...seen.values()].some(Boolean));
+    });
+    [heroRef, liveRef, footRef].forEach((r) => r.current && io.observe(r.current));
+    return () => io.disconnect();
+  }, []);
   const start = (s?: Sport, m?: LiveMatch | null) => {
     setSport(s);
     setMatch(m ?? null);
@@ -58,8 +73,8 @@ export default function Home() {
   return (
     <main className="overflow-x-hidden">
       {/* ================= HERO: centred sticker wordmark ================= */}
-      <section className="flood relative pb-28 sm:pb-44">
-        <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pt-5">
+      <section ref={heroRef} className="flood relative pb-24 sm:pb-44">
+        <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pt-4 sm:pt-5">
           <Brand />
           <div className="hidden items-center gap-7 text-sm font-bold text-on-muted md:flex">
             <a href="#live" className="transition hover:text-orange">
@@ -75,64 +90,69 @@ export default function Home() {
           <ThemeToggle />
         </nav>
 
-        {/* floating stickers */}
-        <Art src="b5/bolt" className="floaty absolute left-[4%] top-24 w-16 sm:w-24" style={{ ["--r" as string]: "-14deg" }} />
-        <Art src="b5/invader" className="floaty absolute right-[6%] top-28 w-14 sm:w-20 [animation-delay:1.2s]" />
+        {/* floating stickers (desktop gets the full crowd; phones keep the two on the wordmark) */}
+        <Art src="b5/bolt" className="floaty absolute left-[4%] top-24 hidden w-24 sm:block" style={{ ["--r" as string]: "-14deg" }} />
+        <Art src="b5/invader" className="floaty absolute right-[6%] top-28 hidden w-20 sm:block [animation-delay:1.2s]" />
         <Art src="b2/foam-finger" className="floaty absolute left-[7%] top-[26rem] hidden w-28 md:block [animation-delay:.6s]" style={{ ["--r" as string]: "12deg" }} />
         <Art src="b2/stopwatch" className="floaty absolute right-[8%] top-[24rem] hidden w-24 md:block [animation-delay:2s]" style={{ ["--r" as string]: "10deg" }} />
-        <Art src="b5/sparkle" className="twinkle absolute left-[24%] top-28 w-6" />
-        <Art src="b5/sparkle" className="twinkle absolute right-[26%] top-20 w-5 [animation-delay:.9s]" />
+        <Art src="b5/sparkle" className="twinkle absolute left-[24%] top-28 hidden w-6 sm:block" />
+        <Art src="b5/sparkle" className="twinkle absolute right-[26%] top-20 hidden w-5 sm:block [animation-delay:.9s]" />
 
-        <div className="relative z-10 mx-auto max-w-3xl px-4 pt-8 text-center sm:pt-14">
+        <div className="relative z-10 mx-auto max-w-3xl px-4 pt-5 text-center sm:pt-14">
           <a
             href="#nexconn"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-ink bg-paper py-1 pl-1 pr-3 text-xs font-bold text-ink shadow-[0_3px_0_var(--shadow)] transition hover:-translate-y-0.5"
+            className="relative inline-flex items-center gap-2 rounded-full border-2 border-ink bg-paper py-1 pl-1 pr-3 text-xs font-bold text-ink shadow-[0_3px_0_var(--shadow)] transition before:absolute before:inset-x-0 before:-inset-y-2 before:content-[''] hover:-translate-y-0.5"
           >
-            <span className="rounded-full bg-orange px-2 py-0.5 text-[11px] font-extrabold">NEXCONN</span>
+            <span className="rounded-full bg-orange px-2 py-0.5 text-xs font-extrabold">NEXCONN</span>
             Built for the Build Challenge 2026
           </a>
-          <div className="relative mx-auto mt-8 w-fit">
-            <Art src="b5/starburst" className="absolute -left-10 -top-8 w-20 -rotate-12 sm:-left-16 sm:w-28" />
-            <Art src="b1/cricket" className="absolute -right-8 -top-10 w-16 rotate-12 sm:-right-14 sm:w-24" />
-            <Wordmark size="text-[3.7rem] sm:text-[8.2rem]" className="relative" />
+          <div className="relative mx-auto mt-10 w-fit sm:mt-8">
+            <Art src="b5/starburst" className="pointer-events-none absolute -left-7 -top-5 w-14 -rotate-12 sm:-left-16 sm:-top-8 sm:w-28" />
+            <Art src="b1/cricket" className="pointer-events-none absolute -right-6 -top-6 w-12 rotate-12 sm:-right-14 sm:-top-10 sm:w-24" />
+            <Wordmark size="text-[clamp(2.9rem,15vw,3.6rem)] sm:text-[8.2rem]" className="relative" />
           </div>
-          <p className="mt-5 text-sm font-bold text-on-muted">Points only · never money</p>
-          <h1 className="font-display mt-6 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">
+          <h1 className="font-display mt-5 text-[2rem] font-extrabold leading-[1.05] tracking-tight sm:mt-6 sm:text-5xl">
             Watch apart.
             <br />
             <span className="text-orange">Call it together.</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base text-on-muted sm:text-lg">
-            Pick the match you&apos;re watching, bring your friends, and call the next ball, penalty or point. The server locks it the
-            moment it happens.
+          <p className="mx-auto mt-3 max-w-xl text-[15px] leading-snug text-on-muted sm:mt-4 sm:text-lg">
+            Call the next ball, penalty or point with friends watching somewhere else. The server locks every call the moment it
+            happens. <b className="text-on">Points only, never money.</b>
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <button className="key text-lg" onClick={() => start()}>
+          <div className="mx-auto mt-6 flex max-w-xs flex-col gap-3 sm:mt-8 sm:max-w-none sm:flex-row sm:justify-center">
+            <button className="key min-h-14 text-lg" onClick={() => start()}>
               Start a room
             </button>
-            <a href="/try" className="key key-paper text-lg">
-              60-second demo
+            <a href="/try" className="key key-paper min-h-12 text-base sm:min-h-14 sm:text-lg">
+              Try the 60-second demo
             </a>
           </div>
-          <p className="mt-6 flex items-center justify-center gap-2 text-sm text-on-muted">
+          <a
+            href="#live"
+            className="mx-auto mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-sm text-on-muted transition hover:text-orange sm:mt-6"
+          >
             <span className="live-dot" />
             <b className="text-on">{featured ? liveNow.length : "…"}</b> matches live right now
-          </p>
+            <span aria-hidden className="font-bold">
+              ↓
+            </span>
+          </a>
         </div>
-        <Pitch className="absolute inset-x-0 bottom-0 h-28 sm:h-36" />
-        <Art src="b3/pumped" className="floaty absolute bottom-4 right-[10%] z-10 w-20 sm:w-28" />
-        <Art src="b4/football" className="absolute bottom-3 left-[9%] z-10 hidden w-24 sm:block" />
+        <Pitch className="absolute inset-x-0 bottom-0 h-20 sm:h-36" />
+        <Art src="b3/pumped" className="floaty pointer-events-none absolute bottom-3 right-[8%] z-10 w-14 sm:bottom-4 sm:right-[10%] sm:w-28" />
+        <Art src="b4/football" className="pointer-events-none absolute bottom-3 left-[9%] z-10 hidden w-24 sm:block" />
       </section>
 
       <ScoreTicker matches={featured} />
 
       {/* ================= PICK YOUR MATCH: tilted tickets ================= */}
-      <section id="live" className="mx-auto max-w-6xl scroll-mt-6 px-4 py-20">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <h2 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Pick your match</h2>
-          <p className="max-w-sm text-on-muted">Real matches on air right now. Tap yours and open a room for it.</p>
+      <section ref={liveRef} id="live" className="mx-auto max-w-6xl scroll-mt-4 px-4 pb-10 pt-12 sm:py-20">
+        <div className="flex flex-wrap items-end justify-between gap-2 sm:gap-4">
+          <h2 className="font-display text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">Pick your match</h2>
+          <p className="max-w-sm text-[15px] text-on-muted sm:text-base">Real matches on air right now. Tap yours to open a room.</p>
         </div>
-        <div className="mt-6 flex flex-col gap-3 sm:hidden">
+        <div className="mt-5 flex flex-col gap-3 sm:hidden">
           {featured === null && Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
           {(liveNow.length ? liveNow : featured ?? []).slice(0, 4).map((m) => (
             <MatchRow key={m.sport + m.id} m={m} onPick={(x) => start(x.sport, x)} />
@@ -148,19 +168,19 @@ export default function Home() {
           ))}
         </div>
 
-        <details className="group mt-12 rounded-[22px] border-2 border-ink bg-stage-2 shadow-[0_5px_0_var(--shadow)]">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
-            <span className="font-display text-lg font-extrabold">
+        <details className="group mt-6 rounded-[22px] border-2 border-ink bg-stage-2 shadow-[0_5px_0_var(--shadow)] sm:mt-12">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-4">
+            <span className="font-display text-base font-extrabold sm:text-lg">
               Can&apos;t see yours? Search every match
             </span>
-            <span className="grid h-8 w-8 place-items-center rounded-full border-2 border-ink bg-orange font-bold text-ink transition-transform group-open:rotate-45">+</span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-2 border-ink bg-orange font-bold text-ink transition-transform group-open:rotate-45">+</span>
           </summary>
-          <div className="border-t-2 border-dashed border-line px-5 pb-5 pt-4">
+          <div className="border-t-2 border-dashed border-line px-4 pb-5 pt-4 sm:px-5">
             <LiveBrowser onPick={(m) => start(m.sport, m)} limit={12} />
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <span className="mr-1 text-sm font-bold">No feed for your sport?</span>
               {(["kabaddi", "badminton", "esports", "other"] as Sport[]).map((s) => (
-                <button key={s} onClick={() => start(s)} className="chip">
+                <button key={s} onClick={() => start(s)} className="chip min-h-11 text-sm">
                   <Art src={SPORT_ART[s].bolo} className="h-5 w-5" /> {SPORT_LABEL[s]}
                 </button>
               ))}
@@ -170,8 +190,8 @@ export default function Home() {
       </section>
 
       {/* ================= HOUSE RULES: tactics board ================= */}
-      <section className="px-4 py-10">
-        <div className="chalkboard relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border-[3px] border-ink p-6 text-paper shadow-[8px_8px_0_var(--shadow)] sm:p-10">
+      <section className="px-4 py-6 sm:py-10">
+        <div className="chalkboard relative mx-auto max-w-6xl overflow-hidden rounded-[24px] border-[3px] border-ink p-4 text-paper shadow-[6px_6px_0_var(--shadow)] sm:rounded-[28px] sm:p-10 sm:shadow-[8px_8px_0_var(--shadow)]">
           <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.16]" viewBox="0 0 800 400" preserveAspectRatio="none" aria-hidden>
             <rect x="20" y="20" width="760" height="360" fill="none" stroke="#fff" strokeWidth="3" />
             <line x1="400" y1="20" x2="400" y2="380" stroke="#fff" strokeWidth="3" />
@@ -182,18 +202,18 @@ export default function Home() {
             <circle cx="620" cy="120" r="14" fill="none" stroke="#fff" strokeWidth="3" />
             <circle cx="680" cy="250" r="14" fill="none" stroke="#fff" strokeWidth="3" />
           </svg>
-          <div className="relative grid gap-10 lg:grid-cols-[1fr_1.4fr]">
-            <div>
+          <div className="relative grid gap-6 sm:gap-10 lg:grid-cols-[1fr_1.4fr]">
+            <div className="px-1 pt-2 sm:p-0">
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange">THE GAME PLAN</p>
-              <h2 className="font-display mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">House rules</h2>
-              <p className="mt-5 text-lg font-bold">
+              <h2 className="font-display mt-2 text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">House rules</h2>
+              <p className="mt-3 text-base font-bold sm:mt-5 sm:text-lg">
                 Not a <s className="decoration-red decoration-[3px]">betting app</s>. Not a <s className="decoration-red decoration-[3px]">poll</s>. Not a{" "}
                 <s className="decoration-red decoration-[3px]">group chat</s>.
               </p>
-              <p className="mt-3 max-w-md text-paper/75">It&apos;s the sofa you used to share, rebuilt for friends who watch from different places.</p>
+              <p className="mt-2 max-w-md text-[15px] text-paper/75 sm:mt-3 sm:text-base">It&apos;s the sofa you used to share, rebuilt for friends who watch from different places.</p>
               <Art src="c2/cricket-umpire" className="mt-6 hidden w-36 lg:block" />
             </div>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {[
                 { n: "01", t: "The lock is real.", d: "Calls close the moment it happens, on the server's clock. A late tap gets “Locked” and the exact delay.", art: "b2/lock", c: "bg-yellow" },
                 { n: "02", t: "Only the server posts results.", d: "Forged result cards and betting spam are refused before they're delivered to anyone.", art: "b2/check", c: "bg-k-leaf" },
@@ -201,14 +221,14 @@ export default function Home() {
               ].map((r, i) => (
                 <div
                   key={r.n}
-                  className={`group flex items-center gap-4 rounded-2xl border-[2.5px] border-ink ${r.c} p-4 text-ink shadow-[5px_5px_0_var(--shadow)] transition-transform duration-200 hover:-translate-y-1 hover:rotate-[-0.6deg] ${i === 1 ? "lg:ml-10" : i === 2 ? "lg:ml-4" : ""}`}
+                  className={`group flex items-center gap-3 rounded-2xl border-[2.5px] border-ink ${r.c} p-3.5 text-ink sm:gap-4 sm:p-4 shadow-[5px_5px_0_var(--shadow)] transition-transform duration-200 hover:-translate-y-1 hover:rotate-[-0.6deg] ${i === 1 ? "lg:ml-10" : i === 2 ? "lg:ml-4" : ""}`}
                 >
-                  <span className="font-led text-4xl text-ink/40">{r.n}</span>
-                  <div className="flex-1">
-                    <p className="font-display text-xl font-extrabold">{r.t}</p>
-                    <p className="mt-0.5 text-sm text-ink/75">{r.d}</p>
+                  <span className="font-led text-4xl text-ink/40 max-sm:hidden">{r.n}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-lg font-extrabold leading-tight sm:text-xl">{r.t}</p>
+                    <p className="mt-1 text-sm leading-snug text-ink/75">{r.d}</p>
                   </div>
-                  <Art src={r.art} className="h-14 w-14 shrink-0 transition-transform group-hover:rotate-12 group-hover:scale-110" />
+                  <Art src={r.art} className="h-11 w-11 shrink-0 transition-transform sm:h-14 sm:w-14 group-hover:rotate-12 group-hover:scale-110" />
                 </div>
               ))}
             </div>
@@ -217,33 +237,35 @@ export default function Home() {
       </section>
 
       {/* ================= HOW IT WORKS: steps row + the lock card ================= */}
-      <section id="how" className="mx-auto max-w-6xl scroll-mt-6 px-4 py-24">
-        <h2 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">How does it work?</h2>
-        <div className="mt-10 grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-6">
+      <section id="how" className="mx-auto max-w-6xl scroll-mt-4 px-4 py-12 sm:py-24">
+        <h2 className="font-display text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">How does it work?</h2>
+        <ol className="mt-6 grid grid-cols-1 gap-3 sm:mt-10 sm:grid-cols-3 sm:gap-8 lg:grid-cols-6">
           {OVER.map((b, i) => (
-            <div key={b.t} className="group">
+            <li key={b.t} className="group flex items-start gap-3.5 sm:block">
               <span
-                className={`grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink font-display text-lg font-extrabold shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-1 group-hover:rotate-12 ${
+                className={`grid h-11 w-11 shrink-0 place-items-center sm:h-12 sm:w-12 rounded-full border-[2.5px] border-ink font-display text-lg font-extrabold shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-1 group-hover:rotate-12 ${
                   b.hot ? "bg-red text-white" : b.win ? "bg-lime text-ink" : "bg-orange text-ink"
                 }`}
               >
-                {b.art ? <Art src={b.art} className="h-8 w-8" /> : i + 1}
+                {b.art ? <Art src={b.art} className="h-7 w-7 sm:h-8 sm:w-8" /> : i + 1}
               </span>
-              <p className="font-display mt-4 text-lg font-extrabold">{b.t}</p>
-              <p className="mt-1 text-sm text-on-muted">{b.d}</p>
-            </div>
+              <div className="min-w-0">
+                <p className="font-display text-lg font-extrabold leading-tight sm:mt-4">{b.t}</p>
+                <p className="mt-0.5 text-sm text-on-muted sm:mt-1">{b.d}</p>
+              </div>
+            </li>
           ))}
-        </div>
-        <div className="brut-lg mt-14 grid items-center gap-8 rounded-[28px] bg-paper p-6 text-ink sm:p-8 lg:grid-cols-[1fr_1.1fr]">
-          <div>
-            <span className="rounded-md border-2 border-ink bg-orange px-2 py-0.5 text-[11px] font-extrabold">THE BIT THAT MATTERS</span>
-            <h3 className="font-display mt-3 text-3xl font-extrabold">The lock is the game</h3>
+        </ol>
+        <div className="brut-lg mt-8 grid items-center gap-6 rounded-[24px] bg-paper p-4 text-ink sm:mt-14 sm:gap-8 sm:rounded-[28px] sm:p-8 lg:grid-cols-[1fr_1.1fr]">
+          <div className="px-1 pt-1 sm:p-0">
+            <span className="rounded-md border-2 border-ink bg-orange px-2 py-0.5 text-xs font-extrabold">THE BIT THAT MATTERS</span>
+            <h3 className="font-display mt-3 text-[1.7rem] font-extrabold leading-tight sm:text-3xl">The lock is the game</h3>
             <p className="mt-2 font-semibold">Every call is stamped by the server when it lands, not by your phone.</p>
             <p className="mt-2 text-sm text-muted">
               On a delayed stream? Nobody can sneak a call in after it happens. A late tap gets “Locked” and the exact delay, and reviews hold
               the points until the decision is in.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold">
+            <div className="mt-4 flex flex-wrap items-center gap-1.5 text-xs font-bold sm:mt-5 sm:gap-2">
               {["Host taps Go", "Calls open", "It happens", "LOCKED", "Result settles"].map((x, i, a) => (
                 <span key={x} className="flex items-center gap-2">
                   <span className={`rounded-full border-2 border-ink px-3 py-1.5 ${x === "LOCKED" ? "bg-red text-white" : i === a.length - 1 ? "bg-lime" : "bg-k-butter"}`}>{x}</span>
@@ -282,22 +304,22 @@ export default function Home() {
       </section>
 
       {/* ================= BUILT ON NEXCONN: the team sheet ================= */}
-      <section className="mx-auto max-w-6xl px-4 pt-24" id="nexconn">
+      <section className="mx-auto max-w-6xl scroll-mt-4 px-4 pt-6 sm:pt-24" id="nexconn">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange">BUILT FOR THE NEXCONN BUILD CHALLENGE 2026</p>
-            <h2 className="font-display mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">The starting XI</h2>
-            <p className="mt-2 max-w-xl text-on-muted">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange sm:text-sm sm:tracking-[0.2em]">BUILT FOR THE NEXCONN BUILD CHALLENGE 2026</p>
+            <h2 className="font-display mt-2 text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">The starting XI</h2>
+            <p className="mt-2 max-w-xl text-[15px] text-on-muted sm:text-base">
               Every live moment in Called It runs on Nexconn. Here&apos;s the team sheet: eleven Nexconn features, and the job each one plays.
             </p>
           </div>
-          <div className="led rounded-xl px-4 py-3 text-center">
+          <div className="led rounded-xl px-4 py-3 text-center max-sm:hidden">
             <p className="font-led text-lg text-paper/60">POWERED BY</p>
             <p className="font-arcade text-2xl text-yellow">NEXCONN CHAT</p>
             <p className="font-led text-lg text-paper/60">WEB SDK 26.2 · SERVER API</p>
           </div>
         </div>
-        <div className="mt-10 grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
+        <div className="mt-6 grid gap-6 sm:mt-10 lg:grid-cols-[0.9fr_1.4fr]">
           {/* formation */}
           <div className="turf relative aspect-[4/5] overflow-hidden rounded-[24px] border-[3px] border-ink shadow-[8px_8px_0_var(--shadow)] max-lg:hidden">
             <svg viewBox="0 0 100 125" className="absolute inset-0 h-full w-full" aria-hidden>
@@ -325,7 +347,7 @@ export default function Home() {
           </div>
           {/* team sheet */}
           <div className="paper brut-lg overflow-hidden rounded-[24px]">
-            <div className="flex items-center justify-between border-b-[3px] border-ink bg-orange px-5 py-3">
+            <div className="flex items-center justify-between border-b-[3px] border-ink bg-orange px-4 py-3 sm:px-5">
               <p className="font-arcade text-lg">TEAM SHEET</p>
               <p className="font-led text-xl">NEXCONN XI</p>
             </div>
@@ -334,60 +356,86 @@ export default function Home() {
                 <li
                   key={p.k}
                   id={`nx-${i + 1}`}
-                  className="group flex items-start gap-3 border-b-2 border-dashed border-ink/20 px-5 py-3 transition-colors last:border-0 hover:bg-k-butter/60"
+                  className={`group flex items-start gap-3 border-b-2 border-dashed border-ink/20 px-4 py-3 transition-colors last:border-0 hover:bg-k-butter/60 sm:px-5 ${!allXI && i >= 4 ? "max-sm:hidden" : ""}`}
                 >
-                  <span className="font-led w-7 shrink-0 text-3xl leading-none text-orange-d">{i + 1}</span>
+                  <span className="font-led w-6 shrink-0 text-3xl leading-none text-orange-d sm:w-7">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <p className="font-display font-extrabold">
                       {p.k} <span className="font-led ml-1 text-lg font-normal text-muted">· {p.pos}</span>
                     </p>
-                    <p className="text-sm text-muted">{p.d}</p>
+                    <p className="text-sm leading-snug text-muted">{p.d}</p>
                   </div>
                   <Art src={p.art} className="h-9 w-9 shrink-0 transition-transform group-hover:rotate-12 group-hover:scale-110" />
                 </li>
               ))}
             </ol>
+            {!allXI && (
+              <button
+                onClick={() => setAllXI(true)}
+                className="flex min-h-12 w-full items-center justify-center gap-2 border-t-[3px] border-ink bg-k-butter text-sm font-extrabold text-ink sm:hidden"
+              >
+                Show all 11 Nexconn features <span aria-hidden>↓</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
 
       {/* ================= FAQ: two columns of outlined cards ================= */}
-      <section className="mx-auto max-w-6xl px-4 py-24">
-        <h2 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">FAQs</h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-4">
-            {FAQS.filter((_, i) => i % 2 === 0).map((f) => (
-              <Faq key={f.q} {...f} />
-            ))}
-          </div>
-          <div className="flex flex-col gap-4">
-            {FAQS.filter((_, i) => i % 2 === 1).map((f) => (
-              <Faq key={f.q} {...f} />
-            ))}
-          </div>
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:py-24">
+        <h2 className="font-display text-[2rem] font-extrabold leading-tight tracking-tight sm:text-5xl">FAQs</h2>
+        <div className="mt-6 gap-4 sm:mt-8 md:columns-2">
+          {FAQS.map((f) => (
+            <div key={f.q} className="mb-3 break-inside-avoid sm:mb-4">
+              <Faq {...f} />
+            </div>
+          ))}
         </div>
       </section>
 
       {/* ================= FOOTER ================= */}
-      <footer className="flood relative overflow-hidden px-4 pb-40 pt-20 text-center">
+      <footer ref={footRef} className="flood relative overflow-hidden px-4 pb-32 pt-14 text-center sm:pb-40 sm:pt-20">
         <div className="flex justify-center">
-          <Wordmark size="text-6xl sm:text-8xl" stacked={false} />
+          <Wordmark size="text-[clamp(2.4rem,12vw,3.75rem)] sm:text-8xl" stacked={false} />
         </div>
-        <p className="font-display mt-6 text-xl font-bold">Watch apart. Call it together.</p>
-        <button className="key mt-8 text-lg" onClick={() => start()}>
+        <p className="font-display mt-5 text-lg font-bold sm:mt-6 sm:text-xl">Watch apart. Call it together.</p>
+        <button className="key mt-6 min-h-14 w-full max-w-xs text-lg sm:mt-8 sm:w-auto" onClick={() => start()}>
           Start a room
         </button>
-        <p className="relative z-10 mt-10 text-xs text-on-muted">
+        <p className="relative z-10 mt-8 text-xs leading-relaxed text-on-muted sm:mt-10">
           Built on Nexconn Chat for the Nexconn Build Challenge 2026 ·{" "}
-          <a className="underline hover:text-orange" href="/impact">
+          <a className="inline-flex min-h-11 items-center underline hover:text-orange" href="/impact">
             Live impact
           </a>{" "}
           · Points only, never money
         </p>
-        <Pitch className="absolute inset-x-0 bottom-0 h-28" />
-        <Art src="b4/esports" className="absolute bottom-3 left-[10%] z-10 w-20" />
-        <Art src="b4/racing" className="absolute bottom-3 right-[10%] z-10 w-20" />
+        <Pitch className="absolute inset-x-0 bottom-0 h-24 sm:h-28" />
+        <Art src="b4/esports" className="pointer-events-none absolute bottom-3 left-[8%] z-10 w-14 sm:left-[10%] sm:w-20" />
+        <Art src="b4/racing" className="pointer-events-none absolute bottom-3 right-[8%] z-10 w-14 sm:right-[10%] sm:w-20" />
       </footer>
+
+      {/* phones: one primary action under the thumb while reading the middle of the page */}
+      <div
+        className="thumb-bar fixed inset-x-0 bottom-0 z-40 px-3 pt-3 sm:hidden"
+        data-show={barOn && !open}
+        aria-hidden={!barOn || open}
+      >
+        <div className="brut mx-auto flex max-w-md items-center gap-2 rounded-2xl bg-paper p-2 text-ink">
+          <a
+            href="#live"
+            tabIndex={barOn ? 0 : -1}
+            className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-xl px-2 text-sm font-bold"
+          >
+            <span className="live-dot shrink-0" />
+            <span className="truncate">
+              <b>{featured ? liveNow.length : "…"}</b> live now
+            </span>
+          </a>
+          <button tabIndex={barOn ? 0 : -1} className="key min-h-12 shrink-0 px-5 text-base" onClick={() => start()}>
+            Start a room
+          </button>
+        </div>
+      </div>
 
       <StartRoom open={open} onClose={() => setOpen(false)} sport={sport} match={match} />
     </main>

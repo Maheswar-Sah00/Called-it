@@ -11,6 +11,7 @@ import {
   type Reaction,
   SPORT_ART,
   SPORT_LABEL,
+  STREAK_BONUS,
   blockReason,
   type ResultCard,
   type RoomState,
@@ -43,6 +44,51 @@ function useNow(ms = 200) {
   return n;
 }
 
+/** A short haptic tick on phones that support it (silently ignored elsewhere). */
+function buzz(p: number | number[]) {
+  try {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator && !reducedMotion()) navigator.vibrate(p);
+  } catch {
+    /* not allowed before a user gesture: fine */
+  }
+}
+
+function reducedMotion() {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Phones: the on-screen keyboard shrinks the visual viewport, not the layout one.
+ * Mirror its height into --ra-vvh so the chat can fit above the keyboard, and report whether it is open.
+ */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    // compare against the tallest viewport seen at this width (iOS shrinks innerHeight too, so it is no baseline)
+    let base = vv.height;
+    let width = window.innerWidth;
+    const sync = () => {
+      if (window.innerWidth !== width) {
+        width = window.innerWidth;
+        base = vv.height;
+      }
+      base = Math.max(base, vv.height);
+      root.style.setProperty("--ra-vvh", `${Math.round(vv.height)}px`);
+      setOpen(window.innerWidth < 1024 && vv.scale < 1.05 && vv.height < base * 0.78);
+    };
+    sync();
+    vv.addEventListener("resize", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      root.style.removeProperty("--ra-vvh");
+    };
+  }, []);
+  return open;
+}
+
 export function Room({ id }: { id: string }) {
   const { info, join, error: sessionError } = useSession();
   const me = info?.session ?? null;
@@ -64,6 +110,10 @@ export function Room({ id }: { id: string }) {
   const [results, setResults] = useState<ResultCard[]>([]);
   const [stats, setStats] = useState({ cards: 0, chats: 0, forged: 0, blocked: 0 });
   const [retry, setRetry] = useState(0);
+  const [unread, setUnread] = useState(0);
+  const kb = useKeyboardOpen();
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   const keysRef = useRef<HTMLDivElement | null>(null);
   /** live score pushed by Nexconn channel metadata (beats the polled copy) */
   const [pushed, setPushed] = useState<{ s: string; p?: number; d: string; t: [string, string, string][]; at: number } | null>(null);
@@ -85,6 +135,8 @@ export function Room({ id }: { id: string }) {
     const rtt = Date.now() - t0;
     offset.current = r.data.serverNow + rtt / 2 - Date.now();
     setSt(r.data);
+    // a room with no settled result yet: the very first result that lands deserves its celebration
+    if (firstLoad.current && !r.data.lastResult) firstLoad.current = false;
     if (r.data.moment && r.data.myCall) setMyCalls((m) => ({ ...m, [r.data.moment!.mid]: r.data.myCall! }));
     if (r.data.lastResult) {
       const lr = r.data.lastResult;
@@ -196,6 +248,7 @@ export function Room({ id }: { id: string }) {
           if (m.type === "RC:TxtMsg" && m.text) {
             setStats((s) => ({ ...s, chats: s.chats + 1 }));
             const mine = m.from === me?.userId;
+            if (!mine && tabRef.current !== "chat") setUnread((n) => Math.min(99, n + 1));
             setChat((c) =>
               c.some((l) => l.id === m.id)
                 ? c
@@ -243,11 +296,34 @@ export function Room({ id }: { id: string }) {
   // phones: when a new moment opens, bring the answer keys into view
   const openMid = st?.moment?.state === "open" ? st.moment.mid : null;
   useEffect(() => {
-    if (!openMid || typeof window === "undefined" || window.innerWidth >= 1024) return;
+    if (!openMid) return;
+    setCelebrate(null); // a fresh call beats a lingering celebration
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    // never yank someone out of a half-typed chat message: the Play tab badge tells them instead
+    const typing = document.activeElement instanceof HTMLInputElement && !!document.activeElement.value;
+    if (typing) return;
     setTab("play");
-    const t = setTimeout(() => keysRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
+    buzz(18);
+    // only scroll when the keys are not already fully on screen (no jump when they are)
+    const t = setTimeout(() => {
+      const el = keysRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const top = 72; // sticky score bar
+      const bottom = window.innerHeight - 84; // tab bar
+      if (r.top >= top && r.bottom <= bottom) return;
+      const dy = r.bottom > bottom ? Math.min(r.bottom - bottom, r.top - top) : r.top - top;
+      window.scrollBy({ top: dy, behavior: reducedMotion() ? "auto" : "smooth" });
+    }, 140);
     return () => clearTimeout(t);
   }, [openMid]);
+
+  // switching tabs: start the new tab at the top (and clear the chat badge)
+  useEffect(() => {
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    if (tab === "chat") setUnread(0);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [tab]);
 
   // ---------- derived ----------
   const shownResult = useMemo(() => {
@@ -286,9 +362,13 @@ export function Room({ id }: { id: string }) {
     }
     const pick = myCalls[shownResult.mid];
     const right = !!pick && pick === shownResult.outcome;
-    setCelebrate({ key: shownResult.mid, result: shownResult, pick: pick ?? null, right, sport: st?.room.sport ?? "other" });
-    const t = setTimeout(() => setCelebrate(null), 2900);
+    const base = right && st?.moment?.mid === shownResult.mid ? st.moment.options.find((o) => o.id === pick)?.points : undefined;
+    const pts = base === undefined ? undefined : base + (streak >= 2 ? STREAK_BONUS : 0);
+    setCelebrate({ key: shownResult.mid, result: shownResult, pick: pick ?? null, right, sport: st?.room.sport ?? "other", points: pts });
+    if (right) buzz([20, 40, 30]);
+    const t = setTimeout(() => setCelebrate(null), right ? 2600 : 1900);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownResult, myCalls, st?.room.sport]);
 
   useEffect(() => {
@@ -300,7 +380,8 @@ export function Room({ id }: { id: string }) {
 
   useEffect(() => {
     if (!lockFlash) return;
-    const t = setTimeout(() => setLockFlash(0), 1400);
+    buzz(35);
+    const t = setTimeout(() => setLockFlash(0), 1100);
     return () => clearTimeout(t);
   }, [lockFlash]);
 
@@ -313,6 +394,7 @@ export function Room({ id }: { id: string }) {
       return;
     }
     // if our countdown already hit zero we still ask: the server's clock decides and says how late we were
+    buzz(12);
     const prev = myPick;
     setMyCalls((m) => ({ ...m, [moment.mid]: option }));
     const r = await api<{ status: string; tally?: TallyCard; at?: number; lockAt?: number }>(`/api/rooms/${id}/call`, { mid: moment.mid, option, tapAt: Date.now() + offset.current });
@@ -442,32 +524,41 @@ export function Room({ id }: { id: string }) {
   const calledCount = visibleResults.filter((r) => myCalls[r.mid]).length;
 
   return (
-    <main className={`min-h-screen lg:pb-16 ${st?.amHost && st.room.mode === "host" ? "pb-64" : "pb-28"}`}>
-      {/* ===== phones: compact sticky score bar ===== */}
-      <div className="led sticky top-0 z-30 !rounded-none !border-x-0 !border-t-0 px-3 pb-2 pt-2.5 text-paper !shadow-[0_3px_0_var(--shadow)] sm:hidden">
-        <div className="flex items-center gap-2">
-          <Link href="/" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-orange" aria-label="Home">
-            <Art src={SPORT_ART[sport].bolo} className="h-7 w-7" />
+    <main className={`min-h-screen lg:pb-16 ${st?.amHost && st.room.mode === "host" ? "pb-64" : "ra-pad"}`}>
+      {/* ===== phones: compact sticky score bar (one glance: where, score, live, your points) ===== */}
+      <div className="led sticky top-0 z-30 !rounded-none !border-x-0 !border-t-0 px-2.5 py-1.5 text-paper !shadow-[0_3px_0_var(--shadow)] sm:hidden">
+        <div className="flex h-11 items-center gap-2">
+          <Link href="/" className="grid h-11 w-11 shrink-0 place-items-center" aria-label="Home">
+            <span className="grid h-9 w-9 place-items-center rounded-lg border-2 border-ink bg-orange">
+              <Art src={SPORT_ART[sport].bolo} className="h-8 w-8" />
+            </span>
           </Link>
-          <p className="font-arcade min-w-0 flex-1 truncate text-sm">{room?.name ?? "Loading…"}</p>
           <button
+            type="button"
             onClick={() => liveStatus === "offline" && setRetry((n) => n + 1)}
-            className="flex items-center gap-1.5 rounded-md border border-white/20 px-1.5 py-0.5"
+            className="min-w-0 flex-1 text-left"
+            aria-label={liveStatus === "offline" ? "Reconnect" : room?.name ?? "Room"}
           >
-            {liveStatus === "live" ? <span className="live-dot !h-2 !w-2" /> : <span className="h-2 w-2 rounded-full bg-white/30" />}
-            <span className="font-led text-base leading-none">{liveStatus === "live" ? `LIVE ${people ?? ""}` : liveStatus === "connecting" ? "TUNING IN" : "TAP TO RETRY"}</span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              {liveStatus === "live" ? <span className="live-dot !h-2 !w-2 shrink-0" /> : <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-white/40" />}
+              <span className="font-arcade truncate text-[13px] leading-tight">{room?.name ?? "Tuning in…"}</span>
+            </span>
+            <span className="font-led led-text block truncate text-[17px] leading-tight">
+              {liveStatus === "offline"
+                ? "RECONNECTING · TAP"
+                : liveView && liveView.teams.length === 2
+                  ? `${liveView.teams[0].abbr} ${liveView.teams[0].score || "-"} · ${liveView.teams[1].abbr} ${liveView.teams[1].score || "-"}`
+                  : st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : liveStatus === "connecting" ? "TUNING IN…" : "")}
+            </span>
           </button>
-          <span className="font-led led-text text-2xl leading-none">{myPoints}</span>
-          <span className="font-led text-xs leading-none text-paper/50">PTS</span>
-          <button className="key key-sm !px-2.5 !py-1 text-xs" onClick={invite}>
+          <div className="shrink-0 text-right leading-none" aria-label={`${myPoints} points${people ? `, ${people} in the room` : ""}`}>
+            <span key={myPoints} className="font-led led-text ra-points block text-[26px] leading-none">{myPoints}</span>
+            <span className="font-led block text-[11px] leading-none text-paper/55">{people ? `PTS · ${people} IN` : "PTS"}</span>
+          </div>
+          <button className="key key-sm h-10 shrink-0 !px-3 !py-0 text-[13px]" onClick={invite} aria-label="Invite friends">
             Invite
           </button>
         </div>
-        <p className="font-led led-text mt-1.5 truncate text-lg leading-none">
-          {liveView && liveView.teams.length === 2
-            ? `${liveView.teams[0].abbr} ${liveView.teams[0].score || "-"} · ${liveView.teams[1].abbr} ${liveView.teams[1].score || "-"}`
-            : st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "")}
-        </p>
       </div>
 
       {/* ===== top bar (tablet/desktop) ===== */}
@@ -552,16 +643,16 @@ export function Room({ id }: { id: string }) {
         </div>
       </header>
 
-      <div className="mx-auto mt-3 max-w-7xl px-3 sm:mt-6 sm:px-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[17rem_minmax(0,1fr)_21rem] [&>*]:min-w-0">
+      <div className="mx-auto mt-3 max-w-7xl overflow-x-clip px-3 sm:mt-6 sm:px-4">
+        <div className="grid grid-cols-1 gap-4 lg:gap-6 lg:grid-cols-[17rem_minmax(0,1fr)_21rem] [&>*]:min-w-0">
           {/* ===== LEFT: you + table ===== */}
-          <aside className={`flex flex-col gap-6 ${tab === "board" ? "" : "max-lg:hidden"}`}>
+          <aside className={`flex flex-col gap-4 lg:gap-6 ${tab === "board" ? "" : "max-lg:hidden"}`}>
             <section className="brut rounded-[20px] bg-paper p-4 text-ink">
               <div className="flex items-center gap-3">
                 <Avatar id={me?.avatar ?? st?.names[me?.userId ?? ""]?.avatar} size={48} className="border-2 border-ink" />
                 <div className="min-w-0">
                   <p className="font-arcade truncate text-lg">{me?.name ?? "Guest"}</p>
-                  <p className="text-xs font-bold text-muted">{myRank >= 0 ? `#${myRank + 1} in this room` : "Not on the table yet"}</p>
+                  <p className="text-xs font-bold text-muted">{myRank >= 0 ? `#${myRank + 1} in this room` : "Make a call to get on the table"}</p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -583,48 +674,60 @@ export function Room({ id }: { id: string }) {
               )}
             </section>
             <TableCard board={board} names={st?.names ?? {}} meId={me?.userId} isHost={!!st?.amHost && room?.mode === "host"} roomId={id} toast={toast.show} />
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("ci:nexconn"))}
+              className="brut-sm flex min-h-12 items-center gap-2.5 rounded-2xl bg-stage-2 px-4 text-left text-sm font-bold lg:hidden"
+            >
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${liveStatus === "live" ? "bg-lime" : "bg-[#888]"}`} />
+              <span className="flex-1">Nexconn inside: live SDK log</span>
+              <span className="font-led text-lg text-on-muted">{stats.cards} CARDS</span>
+            </button>
           </aside>
 
           {/* ===== CENTRE: the moment ===== */}
-          <div className={`flex flex-col gap-6 ${tab === "play" ? "" : "max-lg:hidden"}`}>
+          <div className={`flex flex-col gap-4 lg:gap-6 ${tab === "play" ? "" : "max-lg:hidden"}`}>
             <section className={`brut-lg relative overflow-hidden rounded-[24px] bg-paper text-ink ${late ? "shake" : ""}`}>
               {/* pitch strip */}
-              <div className="turf relative flex min-h-[3.9rem] items-end justify-between gap-2 border-b-[3px] border-ink px-3 pb-2 pt-2 sm:h-32 sm:px-5 sm:pt-0">
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5 pb-0.5 sm:flex-col sm:items-start sm:pb-1">
+              <div className="turf relative flex items-center justify-between gap-2 border-b-[3px] border-ink px-3 py-1.5 sm:h-32 sm:items-end sm:px-5 sm:pb-2 sm:pt-0">
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:pb-1">
                   <span
-                    className={`font-led rounded-md border-2 border-ink px-2 text-xl shadow-[0_3px_0_var(--shadow)] ${
+                    className={`font-led rounded-md border-2 border-ink px-2 text-lg leading-tight shadow-[0_2px_0_var(--shadow)] sm:text-xl ${
                       open ? "bg-lime" : phase === "pending" ? "bg-yellow" : phase === "settled" ? "bg-paper" : phase === "waiting" ? "bg-sand" : "bg-red text-white"
                     }`}
                   >
                     {phaseLabel}
                   </span>
                   {moment?.ball && (
-                    <span className="font-led max-w-full truncate rounded-md bg-black/55 px-2 text-base text-paper sm:text-lg">
+                    <span className="font-led max-w-full truncate rounded-md bg-black/55 px-2 text-[15px] leading-snug text-paper sm:text-lg">
                       OVER {moment.ball.over} · {moment.ball.bowler} → {moment.ball.batter}
                     </span>
                   )}
                 </div>
-                <Art key={bolo} src={bolo} className="pop-in -mb-3 h-16 w-16 shrink-0 drop-shadow-[3px_4px_0_rgba(0,0,0,.35)] sm:-mb-6 sm:h-36 sm:w-36" />
+                <Art key={bolo} src={bolo} className="pop-in h-12 w-12 shrink-0 drop-shadow-[2px_3px_0_rgba(0,0,0,.35)] sm:-mb-6 sm:h-36 sm:w-36" />
               </div>
 
-              <div className="p-4 sm:p-6">
+              <div className="px-3.5 pb-4 pt-3 sm:p-6">
                 <p className="text-sm font-bold text-muted max-sm:hidden">{headline}</p>
-                <h2 className="font-arcade mt-1 text-2xl leading-tight sm:text-4xl">
+                <p className={`text-[13px] font-extrabold sm:hidden ${open && !myPick ? "text-orange-d" : "text-muted"}`}>
+                  {open ? (myPick ? "Call in. Switch until the buzzer." : "Tap a key. Calls lock at the buzzer.") : headline}
+                </p>
+                <h2 className="font-arcade mt-0.5 text-xl leading-tight sm:mt-1 sm:text-4xl">
                   {moment?.q ?? (!room ? "Getting the room ready…" : room.mode === "replay" ? "First ball coming up…" : st?.amHost ? "Ask the room something" : "The host is picking the moment")}
                 </h2>
                 {moment?.ball?.need && <p className="font-led mt-1 text-2xl text-orange-d max-sm:hidden">{moment.ball.need.toUpperCase()}</p>}
 
                 {/* lock fuse */}
                 {phase === "open" && lockIn !== null && (
-                  <div className="mt-3 flex items-center gap-2 sm:mt-4">
-                    <Art src="b2/stopwatch" className="h-7 w-7" />
+                  <div className="mt-2.5 flex items-center gap-2 sm:mt-4" role="timer" aria-label={`${Math.ceil(Math.max(0, lockIn) / 1000)} seconds to lock`}>
+                    <Art src="b2/stopwatch" className={`h-7 w-7 ${lockIn > 0 && lockIn < 2000 ? "shake" : ""}`} />
                     <div className="flex flex-1 gap-[3px]">
                       {Array.from({ length: 24 }).map((_, k) => {
                         const frac = Math.max(0, lockIn / Math.max(1, (moment!.lockAt ?? 0) - moment!.openAt));
-                        return <span key={k} className={`h-4 flex-1 rounded-[3px] border border-ink/40 ${k / 24 < frac ? (lockIn < 2000 ? "bg-red" : "bg-orange") : "bg-sand"}`} />;
+                        return <span key={k} className={`h-3.5 flex-1 rounded-[3px] border border-ink/40 sm:h-4 ${k / 24 < frac ? (lockIn < 2000 ? "bg-red" : "bg-orange") : "bg-sand"}`} />;
                       })}
                     </div>
-                    <span className="font-led w-16 text-right text-3xl">{Math.max(0, lockIn / 1000).toFixed(1)}s</span>
+                    <span className={`font-led w-14 text-right text-[28px] leading-none sm:w-16 sm:text-3xl ${lockIn < 2000 ? "text-red" : ""}`}>{Math.max(0, lockIn / 1000).toFixed(1)}s</span>
                   </div>
                 )}
                 {phase === "open" && lockIn === null && (
@@ -635,43 +738,58 @@ export function Room({ id }: { id: string }) {
 
                 {/* options: arcade keycaps */}
                 {moment && (
-                  <div ref={keysRef} className={`mt-4 grid scroll-mt-28 gap-3 sm:mt-6 sm:gap-3.5 ${moment.options.length > 4 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
+                  <div ref={keysRef} className={`mt-3 grid scroll-mt-20 gap-2.5 sm:mt-6 sm:gap-3.5 ${moment.options.length > 4 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
                     {moment.options.map((o, i) => {
                       const count = st?.tally?.mid === moment.mid ? st.tally.counts[o.id] ?? 0 : 0;
                       const total = st?.tally?.mid === moment.mid ? st.tally.total : 0;
                       const pct = total ? Math.round((count / total) * 100) : 0;
                       const picked = myPick === o.id;
-                      const isResult = phase === "settled" && shownResult?.mid === moment.mid && shownResult.outcome === o.id;
+                      const settledHere = phase === "settled" && shownResult?.mid === moment.mid;
+                      const isResult = settledHere && shownResult!.outcome === o.id;
+                      const missed = settledHere && picked && !isResult;
                       const hostView = !!st?.amHost && room?.mode === "host";
                       const closed = !open || hostView;
+                      const dim = closed && !picked && !isResult;
                       return (
                         <button
                           key={o.id}
+                          data-key={o.id}
                           onClick={() => !hostView && call(o.id)}
                           disabled={!me || hostView}
-                          className={`group relative overflow-hidden rounded-2xl border-[2.5px] border-ink text-left transition-all duration-100 ${
-                            isResult ? "bg-lime" : picked ? "bg-orange" : KEY_FACES[i % KEY_FACES.length]
+                          aria-pressed={picked}
+                          aria-label={`${o.label}, ${o.points} points${picked ? ", your call" : ""}${isResult ? ", the result" : ""}`}
+                          className={`ra-key group relative overflow-hidden rounded-2xl border-[2.5px] border-ink text-left transition-all duration-100 ${
+                            isResult ? "bg-lime" : missed ? "bg-k-rose" : picked ? "bg-orange" : KEY_FACES[i % KEY_FACES.length]
                           } ${
                             picked || isResult
                               ? "translate-y-[4px] shadow-[0_2px_0_var(--shadow)]"
-                              : closed
-                                ? "opacity-55 shadow-[0_6px_0_var(--shadow)]"
-                                : "shadow-[0_6px_0_var(--shadow)] hover:-translate-y-0.5 hover:shadow-[0_8px_0_var(--shadow)] active:translate-y-[5px] active:shadow-[0_1px_0_var(--shadow)]"
-                          }`}
+                              : dim
+                                ? "opacity-50 shadow-[0_4px_0_var(--shadow)]"
+                                : "shadow-[0_6px_0_var(--shadow)] hover:-translate-y-0.5 hover:shadow-[0_8px_0_var(--shadow)]"
+                          } ${isResult ? "ring-[3px] ring-ink ring-offset-2 ring-offset-paper" : ""}`}
                         >
-                          <div className="flex min-h-[3.75rem] items-center gap-2.5 px-3 pb-2.5 pt-2.5 sm:gap-3 sm:px-3.5 sm:pb-3 sm:pt-3">
+                          <div className="flex min-h-[3.9rem] items-center gap-2 px-2.5 pb-2 pt-3 sm:gap-3 sm:px-3.5 sm:pb-3 sm:pt-3">
                             <span className="font-led grid h-9 min-w-9 shrink-0 place-items-center rounded-lg border-2 border-ink bg-paper px-1 text-xl transition-transform group-hover:-rotate-6 sm:h-11 sm:min-w-11 sm:rounded-xl sm:text-2xl">
                               +{o.points}
                             </span>
                             <div className="min-w-0 flex-1">
                               <p className="font-arcade text-[14px] leading-[1.05] sm:text-base">{o.label}</p>
-                              <p className="font-led text-lg leading-none text-ink/60">{total ? `${count} · ${pct}%` : "–"}</p>
+                              <p className="font-led text-[17px] leading-none text-ink/60">{total ? `${count} · ${pct}%` : "–"}</p>
                             </div>
-                            {picked && !isResult && <Art src="b2/check" className="pop-in h-9 w-9" />}
-                            {isResult && <Art src={picked ? "b2/crown" : "b2/check"} className="pop-in h-10 w-10" />}
+                            {isResult && <Art src={picked ? "b2/crown" : "b2/check"} className="pop-in h-10 w-10 shrink-0 max-sm:hidden" />}
+                            {missed && <Art src="b2/cross" className="pop-in h-9 w-9 shrink-0 max-sm:hidden" />}
                           </div>
-                          <div className="h-2 border-t-2 border-ink bg-black/10">
-                            <div className="h-full bg-ink/70 transition-[width] duration-500" style={{ width: `${pct}%` }} />
+                          <div className={`relative border-t-2 border-ink bg-black/10 ${picked || isResult ? "h-5" : "h-2"}`}>
+                            <div className={`h-full transition-[width] duration-500 ${picked || isResult ? "bg-ink/25" : "bg-ink/70"}`} style={{ width: `${pct}%` }} />
+                            {(picked || isResult) && (
+                              <span
+                                className={`font-led pop-in absolute inset-0 grid place-items-center text-[15px] leading-none tracking-wider ${
+                                  isResult || !missed ? "bg-ink text-paper" : "bg-paper/70 text-ink"
+                                }`}
+                              >
+                                {isResult ? (picked ? "YOU CALLED IT" : "RESULT") : missed ? "YOUR CALL" : open ? "YOUR CALL" : "LOCKED IN"}
+                              </span>
+                            )}
                           </div>
                         </button>
                       );
@@ -680,8 +798,10 @@ export function Room({ id }: { id: string }) {
                 )}
 
                 {!moment && (
-                  <div className="mt-5 rounded-2xl border-2 border-dashed border-ink/35 bg-k-butter/50 p-5 text-center text-sm text-muted">
-                    {st?.amHost
+                  <div className="mt-4 rounded-2xl border-2 border-dashed border-ink/35 bg-k-butter/50 p-4 text-center text-sm text-muted sm:mt-5 sm:p-5">
+                    {!room
+                      ? "Tuning in to the room…"
+                      : st?.amHost
                       ? "Use the host controls: pick a question, tap Go, then tap Lock the moment it happens."
                       : room?.mode === "replay"
                         ? "The first ball is coming up…"
@@ -690,15 +810,15 @@ export function Room({ id }: { id: string }) {
                 )}
 
                 {phase === "pending" && (
-                  <div className="mt-5 flex items-center gap-3 rounded-2xl border-2 border-ink bg-yellow p-3">
+                  <div className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-ink bg-yellow p-3 sm:mt-5">
                     <Art src="b2/replay" className="h-10 w-10" />
                     <p className="text-sm font-bold">Points wait for the decision. Nobody scores until it&apos;s confirmed.</p>
                   </div>
                 )}
                 {phase === "settled" && shownResult?.mid === moment?.mid && shownResult && (
-                  <div className="rise mt-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-ink bg-k-leaf p-3">
-                    <Art src="b2/scoreboard" className="h-10 w-10" />
-                    <p className="flex-1 text-sm">
+                  <div className="rise mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border-2 border-ink bg-k-leaf p-3 sm:mt-5">
+                    <Art src="b2/scoreboard" className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+                    <p className="min-w-[12rem] flex-1 text-sm leading-snug">
                       <b>{shownResult.label}.</b> {shownResult.detail} · {shownResult.winners.length} of {shownResult.total} called it
                     </p>
                     {myCalls[shownResult.mid] === shownResult.outcome && <ShareCalled label={shownResult.label} room={room?.name ?? "the match"} id={id} toast={toast.show} />}
@@ -710,7 +830,9 @@ export function Room({ id }: { id: string }) {
               {(lockFlash > 0 || late) && (
                 <div className="pointer-events-none absolute inset-0 grid place-items-center">
                   <div className="stamp text-center">
-                    <Art src="d2/locked" className="w-64 drop-shadow-[6px_6px_0_rgba(0,0,0,.3)]" />
+                    <span className="font-arcade inline-flex items-center gap-2 rounded-2xl border-[3px] border-ink bg-red px-4 py-2 text-3xl text-white shadow-[5px_5px_0_var(--shadow)] sm:text-5xl">
+                      <Art src="b2/lock" className="h-9 w-9 sm:h-12 sm:w-12" /> LOCKED
+                    </span>
                     {late && late !== "Locked" && <p className="font-led mt-1 rounded-lg bg-ink px-3 py-0.5 text-2xl text-paper">{late.toUpperCase()}</p>}
                   </div>
                 </div>
@@ -737,14 +859,14 @@ export function Room({ id }: { id: string }) {
             )}
 
             {/* ball-by-ball strip */}
-            <section className="brut rounded-[20px] bg-stage-2 p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-led text-2xl">THIS SESSION</p>
-                <p className="font-led text-xl text-on-muted">
+            <section className="brut rounded-[20px] bg-stage-2 p-3.5 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-led text-xl sm:text-2xl">THIS SESSION</p>
+                <p className="font-led text-lg text-on-muted sm:text-xl">
                   {rightCount} RIGHT · {calledCount} CALLED
                 </p>
               </div>
-              <div className="scroll-thin mt-3 flex gap-2.5 overflow-x-auto pb-2">
+              <div className="scroll-thin ra-strip mt-2.5 flex gap-2.5 overflow-x-auto pb-2 pt-1">
                 {visibleResults.length === 0 && <p className="text-sm text-on-muted">Every settled moment lands here as a ball: green if you called it.</p>}
                 {visibleResults.map((r) => {
                   const pick = myCalls[r.mid];
@@ -772,7 +894,7 @@ export function Room({ id }: { id: string }) {
           </div>
 
           {/* ===== RIGHT: the dugout ===== */}
-          <div className={`flex flex-col gap-6 ${tab === "chat" ? "" : "max-lg:hidden"}`}>
+          <div className={`flex flex-col gap-4 lg:gap-6 ${tab === "chat" ? "" : "max-lg:hidden"}`}>
             {CALLS_ENABLED && (
             <div className="max-lg:order-2">
             <Huddle
@@ -799,31 +921,44 @@ export function Room({ id }: { id: string }) {
               setDelay={setDelay}
               muted={muted}
               live={liveStatus === "live"}
+              kb={kb}
             />
           </div>
         </div>
       </div>
 
       {/* mobile tab bar */}
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-1 rounded-2xl border-[2.5px] border-ink bg-stage-2 p-1.5 shadow-[0_5px_0_var(--shadow)] lg:hidden">
+      <nav
+        aria-label="Room"
+        className={`ra-tabbar fixed inset-x-3 z-40 grid grid-cols-3 gap-1 rounded-2xl border-[2.5px] border-ink bg-stage-2 p-1 shadow-[0_4px_0_var(--shadow)] lg:hidden ${kb ? "hidden" : ""}`}
+      >
         {(
           [
             ["play", "Play", "b2/foam-finger"],
             ["board", "Table", "b2/trophy"],
             ["chat", "Dugout", "b2/megaphone"],
           ] as const
-        ).map(([k, label, art]) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-extrabold transition-all ${tab === k ? "bg-orange text-ink shadow-[0_3px_0_var(--shadow)]" : "text-on-muted"}`}
-          >
-            <Art src={art} className="h-6 w-6" /> {label}
-          </button>
-        ))}
+        ).map(([k, label, art]) => {
+          const badge = k === "chat" && tab !== "chat" && unread > 0 ? String(unread > 9 ? "9+" : unread) : k === "play" && tab !== "play" && open && !myPick ? "!" : null;
+          return (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              aria-current={tab === k ? "page" : undefined}
+              aria-label={badge ? `${label} (${k === "chat" ? `${unread} new` : "a call is open"})` : label}
+              className={`relative flex h-12 flex-col items-center justify-center rounded-xl text-[12px] font-extrabold leading-none transition-all ${
+                tab === k ? "bg-orange text-ink shadow-[0_3px_0_var(--shadow)]" : "text-on-muted active:bg-stage-3"
+              }`}
+            >
+              <Art src={art} className={`h-6 w-6 ${tab === k ? "" : "opacity-80"}`} />
+              <span className="mt-0.5">{label}</span>
+              {badge && <span className={`ra-badge ${badge === "!" ? "ra-nudge" : ""}`}>{badge}</span>}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-28 z-40 h-0">
+      <div className="pointer-events-none fixed inset-x-0 bottom-28 z-40 h-0 overflow-visible">
         {floats.map((f) => (
           <span key={f.id} className="float-up absolute" style={{ left: `${f.x}%`, ["--r" as string]: `${(f.x - 50) / 3}deg` }}>
             <Art src={REACTION_ART[f.e as Reaction]?.art ?? "b5/heart"} className="h-14 w-14 drop-shadow-[2px_3px_0_rgba(0,0,0,.35)]" />
@@ -831,7 +966,7 @@ export function Room({ id }: { id: string }) {
         ))}
       </div>
 
-      {celebrate && <Celebration c={celebrate} />}
+      {celebrate && <Celebration c={celebrate} onClose={() => setCelebrate(null)} />}
       <NexconnPanel stats={stats} people={people} live={liveStatus} channelId={room?.channelId} />
       {toast.node}
 
@@ -912,7 +1047,7 @@ function TableCard({
             {isHost && b.id !== meId && !b.id.startsWith("bot_") && (
               <button
                 onClick={() => mute(b.id, b.name)}
-                className="rounded-md border border-paper/40 px-1.5 py-1 text-[10px] font-bold hover:bg-red lg:hidden lg:group-hover:inline"
+                className="min-h-11 min-w-11 rounded-lg border-2 border-paper/40 px-2 text-xs font-bold hover:bg-red lg:hidden lg:group-hover:inline"
                 title="Mute for 10 minutes"
               >
                 MUTE
@@ -938,6 +1073,7 @@ function ChatBox({
   setDelay,
   muted,
   live,
+  kb,
 }: {
   chat: ChatLine[];
   now: number;
@@ -950,29 +1086,57 @@ function ChatBox({
   setDelay: (n: number) => void;
   muted: boolean;
   live: boolean;
+  kb: boolean;
 }) {
   const [text, setText] = useState("");
   const [warn, setWarn] = useState<string | null>(null);
+  const [below, setBelow] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const seen = useRef(0);
   const visible = chat.filter((l) => l.showAt <= now);
   const held = chat.length - visible.length;
 
+  // stay pinned to the newest line only while the reader is already at the bottom
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    const added = visible.length - seen.current;
+    seen.current = visible.length;
+    if (!el || added <= 0) return;
+    const mine = visible[visible.length - 1]?.from === meId;
+    if (atBottom.current || mine) {
+      el.scrollTo({ top: el.scrollHeight, behavior: reducedMotion() ? "auto" : "smooth" });
+      setBelow(0);
+    } else setBelow((n) => n + added);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible.length]);
 
+  // keyboard opened: keep the newest lines in view above it
+  useEffect(() => {
+    const el = listRef.current;
+    if (kb && el && atBottom.current) el.scrollTop = el.scrollHeight;
+  }, [kb]);
+
+  const jump = () => {
+    const el = listRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setBelow(0);
+  };
+
   return (
-    <section className="brut flex h-[calc(100dvh-12.5rem)] min-h-[22rem] flex-col overflow-hidden rounded-[20px] bg-stage-2 max-lg:order-1 lg:h-[36rem]">
-      <div className="flex items-center justify-between gap-2 border-b-2 border-ink bg-stage-3 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Art src="b2/megaphone" className="h-8 w-8" />
-          <p className="font-arcade text-lg">Dugout</p>
+    <section
+      className={`ra-chat brut relative flex min-h-[16rem] flex-col overflow-hidden rounded-[20px] bg-stage-2 max-lg:order-1 ${kb ? "ra-kb" : ""}`}
+    >
+      <div className={`flex items-center justify-between gap-2 border-b-2 border-ink bg-stage-3 px-3 sm:px-4 ${kb ? "py-1" : "py-1.5 sm:py-3"}`}>
+        <div className="flex min-w-0 items-center gap-2">
+          <Art src="b2/megaphone" className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" />
+          <p className="font-arcade truncate text-base sm:text-lg">Dugout</p>
         </div>
-        <label className="flex items-center gap-1.5 text-xs font-bold" title="Hold results and chat to match a delayed stream">
-          <Art src="b2/stopwatch" className="h-6 w-6" /> Shield
+        <label className="flex min-h-11 shrink-0 items-center gap-1.5 text-xs font-bold" title="Hold results and chat to match a delayed stream">
+          <Art src="b2/stopwatch" className="h-6 w-6" /> Spoiler shield
           <select
-            className="font-led rounded-lg border-2 border-ink bg-paper px-1.5 text-lg text-ink outline-none transition hover:bg-yellow"
+            aria-label="Spoiler shield delay"
+            className="font-led h-10 rounded-lg border-2 border-ink bg-paper px-1.5 text-lg text-ink outline-none transition hover:bg-yellow"
             value={delay}
             onChange={(e) => setDelay(Number(e.target.value))}
           >
@@ -984,7 +1148,15 @@ function ChatBox({
           </select>
         </label>
       </div>
-      <div ref={listRef} className="scroll-thin flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3">
+      <div
+        ref={listRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+          if (atBottom.current && below) setBelow(0);
+        }}
+        className="scroll-thin ra-chatlist flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-3 py-3 sm:px-4"
+      >
         {visible.length === 0 && (
           <div className="m-auto text-center text-sm text-on-muted">
             <Art src="b5/heart" className="mx-auto mb-2 h-12 w-12" />
@@ -1015,12 +1187,22 @@ function ChatBox({
         )}
         {held > 0 && <p className="font-led flex items-center justify-center gap-1.5 text-lg text-on-muted"><Art src="b2/stopwatch" className="h-5 w-5" /> {held} HELD FOR YOUR STREAM DELAY</p>}
       </div>
-      <div className="flex justify-between gap-1 border-t-2 border-ink px-3 pt-2.5">
+      {below > 0 && (
+        <button
+          type="button"
+          onClick={jump}
+          className="brut-sm rise absolute left-1/2 z-10 -translate-x-1/2 rounded-full bg-orange px-4 py-2 text-xs font-extrabold text-ink"
+          style={{ bottom: kb ? "4.25rem" : "8.25rem" }}
+        >
+          {below} new {below === 1 ? "message" : "messages"} below
+        </button>
+      )}
+      <div className={`flex justify-between gap-1 border-t-2 border-ink px-3 pt-2 ${kb ? "hidden" : ""}`}>
         {REACTIONS.map((e) => (
           <button
             key={e}
             onClick={() => onReact(e)}
-            className="grid h-11 w-11 place-items-center rounded-xl border-2 border-ink bg-paper shadow-[0_3px_0_var(--shadow)] transition-all hover:-translate-y-1 hover:rotate-12 active:translate-y-[2px] active:shadow-none"
+            className="ra-key grid h-11 w-11 place-items-center rounded-xl border-2 border-ink bg-paper shadow-[0_3px_0_var(--shadow)] transition-all hover:-translate-y-1 hover:rotate-12 active:translate-y-[2px] active:shadow-none"
             aria-label={REACTION_ART[e].label}
             title={REACTION_ART[e].label}
           >
@@ -1029,7 +1211,7 @@ function ChatBox({
         ))}
       </div>
       <form
-        className="flex gap-2 p-3"
+        className="flex gap-2 p-2.5 sm:p-3"
         onSubmit={async (e) => {
           e.preventDefault();
           const t = text.trim();
@@ -1041,7 +1223,9 @@ function ChatBox({
         }}
       >
         <input
-          className={`input !py-2.5 ${warn ? "!border-red" : ""}`}
+          className={`input min-w-0 !py-2.5 !text-base ${warn ? "!border-red" : ""}`}
+          enterKeyHint="send"
+          aria-label="Chat message"
           placeholder={muted ? "The host muted you for a bit" : "Say something about the match…"}
           value={text}
           maxLength={200}
@@ -1051,7 +1235,7 @@ function ChatBox({
             setWarn(blockReason(e.target.value));
           }}
         />
-        <button className="key !px-4" disabled={muted || !text.trim()}>
+        <button className="key min-h-11 shrink-0 !px-4" disabled={muted || !text.trim()}>
           Send
         </button>
       </form>

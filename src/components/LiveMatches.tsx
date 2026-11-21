@@ -58,7 +58,7 @@ function when(m: LiveMatch) {
 export function LiveBadge({ paused, small = false }: { paused?: boolean; small?: boolean }) {
   return (
     <span
-      className={`flex shrink-0 items-center gap-1 rounded-full border-2 border-ink font-extrabold ${small ? "px-1.5 text-[9px]" : "px-2 py-0.5 text-[10px]"} ${
+      className={`flex shrink-0 items-center gap-1 rounded-full border-2 border-ink font-extrabold ${small ? "px-1.5 text-[10px]" : "px-2 py-0.5 text-[11px]"} ${
         paused ? "bg-k-butter text-ink" : "bg-red text-white"
       }`}
     >
@@ -70,7 +70,7 @@ export function LiveBadge({ paused, small = false }: { paused?: boolean; small?:
 function Logo({ src, abbr }: { src: string; abbr: string }) {
   const [bad, setBad] = useState(!src);
   return bad ? (
-    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-ink bg-k-sand text-[9px] font-black text-ink">{abbr.slice(0, 3)}</span>
+    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-ink bg-k-sand text-[10px] font-black text-ink">{abbr.slice(0, 3)}</span>
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="" className="h-7 w-7 shrink-0 object-contain" onError={() => setBad(true)} loading="lazy" />
@@ -83,18 +83,18 @@ export function MatchRow({ m, selected, onPick, cta = "Open room" }: { m: LiveMa
     <button
       onClick={() => onPick(m)}
       className={`group w-full min-w-0 rounded-2xl border-2 border-ink p-3 text-left text-ink transition-all ${
-        selected ? "translate-y-[2px] bg-k-peach shadow-[0_1px_0_var(--shadow)]" : "bg-paper shadow-[0_4px_0_var(--shadow)] hover:-translate-y-0.5 hover:shadow-[0_6px_0_var(--shadow)]"
+        selected ? "translate-y-[2px] bg-k-peach shadow-[0_1px_0_var(--shadow)] outline-[3px] outline-offset-2 outline-orange" : "bg-paper shadow-[0_4px_0_var(--shadow)] hover:-translate-y-0.5 hover:shadow-[0_6px_0_var(--shadow)]"
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+        <span className="flex min-w-0 items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted">
           <Art src={SPORT_ART[m.sport].gear} className="h-4 w-4" />
           <span className="truncate">{m.league}</span>
         </span>
         {m.status === "live" ? (
           <LiveBadge paused={m.paused} />
         ) : (
-          <span className="shrink-0 rounded-full border-2 border-ink bg-k-sand px-2 py-0.5 text-[10px] font-extrabold">{when(m)}</span>
+          <span className="shrink-0 rounded-full border-2 border-ink bg-k-sand px-2 py-0.5 text-[11px] font-extrabold">{when(m)}</span>
         )}
       </div>
       {m.teams.length === 2 && m.sport !== "f1" ? (
@@ -103,7 +103,7 @@ export function MatchRow({ m, selected, onPick, cta = "Open room" }: { m: LiveMa
             <div key={t.name} className="flex items-center gap-2">
               <Logo src={t.logo} abbr={t.abbr} />
               <span className={`min-w-0 flex-1 truncate text-sm ${t.winner ? "font-extrabold" : "font-bold"}`}>{t.name}</span>
-              <span className="font-led min-w-0 max-w-[58%] shrink truncate text-right text-xl leading-none">{t.score}</span>
+              <span className={`font-led min-w-0 max-w-[62%] shrink truncate text-right leading-none ${(t.score ?? "").length > 11 ? "text-base" : "text-xl"}`}>{t.score}</span>
             </div>
           ))}
         </div>
@@ -112,7 +112,7 @@ export function MatchRow({ m, selected, onPick, cta = "Open room" }: { m: LiveMa
       )}
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-xs text-muted">{m.status === "live" ? m.detail || m.venue : m.venue}</span>
-        <span className="shrink-0 text-xs font-extrabold text-orange-d transition-transform group-hover:translate-x-0.5">{selected ? "Selected ✓" : `${cta} →`}</span>
+        <span className="shrink-0 text-sm font-extrabold text-orange-d transition-transform group-hover:translate-x-0.5">{selected ? "Selected ✓" : `${cta} →`}</span>
       </div>
     </button>
   );
@@ -148,22 +148,22 @@ export function LiveBrowser({
 
   return (
     <div>
-      <div className={`scroll-thin -mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 ${fixedSport ? "hidden" : ""}`}>
+      <div className={`scroll-thin -mx-1 flex snap-x gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 ${fixedSport ? "hidden" : ""}`}>
         {FEED_TABS.map((t) => (
-          <button key={t} className="chip min-h-10 shrink-0 snap-start" data-on={sport === t} onClick={() => setSport(t)}>
+          <button key={t} className="chip min-h-11 shrink-0 snap-start text-sm" data-on={sport === t} onClick={() => setSport(t)}>
             {t === "all" ? "All sports" : t === "hockey" ? "Ice hockey" : SPORT_LABEL[t]}
           </button>
         ))}
       </div>
       <div className={fixedSport ? "" : "mt-3"}>
-        <input className="input !py-2.5" placeholder="Search a team or league" value={q} onChange={(e) => setQ(e.target.value)} />
-        <p className="mt-1.5 text-xs font-bold text-on-muted">{matches ? `${liveCount} live now · ${matches.length - liveCount} starting soon` : "Loading matches…"}</p>
+        <input className="input !py-2.5 text-base" type="search" enterKeyHint="search" aria-label="Search a team or league" placeholder="Search a team or league" value={q} onChange={(e) => setQ(e.target.value)} />
+        <p className={`mt-1.5 text-xs font-bold ${compact ? "text-muted" : "text-on-muted"}`}>{matches ? `${liveCount} live now · ${matches.length - liveCount} starting soon` : "Loading matches…"}</p>
       </div>
-      <div className={`mt-3 grid grid-cols-[minmax(0,1fr)] gap-3 ${compact ? "max-h-[38dvh] overflow-y-auto pr-1 scroll-thin" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+      <div className={`mt-3 grid grid-cols-[minmax(0,1fr)] gap-3 ${compact ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
         {matches === null &&
           Array.from({ length: compact ? 3 : 6 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
         {matches && shown.length === 0 && (
-          <p className="rounded-2xl border-2 border-dashed border-line p-5 text-sm text-on-muted sm:col-span-full">
+          <p className={`rounded-2xl border-2 border-dashed p-5 text-sm sm:col-span-full ${compact ? "border-ink/25 text-muted" : "border-line text-on-muted"}`}>
             {q ? "No match found for that search." : "Nothing live in this sport right now. Pick another, or name your own match."}
           </p>
         )}
@@ -195,7 +195,7 @@ export function MatchTicket({ m, i, onPick }: { m: LiveMatch; i: number; onPick:
     >
       <div className="brut rounded-[22px] bg-paper p-2.5 text-ink transition-shadow group-hover:shadow-[8px_9px_0_var(--shadow)]">
         <div className={`relative grid h-32 place-items-center overflow-hidden rounded-[14px] border-2 border-ink ${BANDS[m.sport] ?? "bg-k-sand"}`}>
-          <span className="absolute left-2 top-1.5 max-w-[70%] truncate text-[10px] font-extrabold uppercase tracking-wide text-ink/60">{m.league}</span>
+          <span className="absolute left-2 top-1.5 max-w-[60%] truncate text-[11px] font-extrabold uppercase tracking-wide text-ink/60">{m.league}</span>
           {m.status === "live" ? (
             <span className="absolute right-2 top-1.5">
               <LiveBadge paused={m.paused} small />
@@ -217,7 +217,7 @@ export function MatchTicket({ m, i, onPick }: { m: LiveMatch; i: number; onPick:
           ) : (
             <p className="font-display line-clamp-2 text-sm font-extrabold">{m.title}</p>
           )}
-          <p className="mt-1 line-clamp-1 text-[11px] text-muted">{m.status === "live" ? m.detail || m.statusText : m.venue}</p>
+          <p className="mt-1 line-clamp-1 text-xs text-muted">{m.status === "live" ? m.detail || m.statusText : m.venue}</p>
           <span className="key key-sm mt-2.5 w-full">Enter →</span>
         </div>
       </div>

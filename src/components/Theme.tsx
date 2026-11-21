@@ -111,7 +111,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
             role="radio"
             aria-checked={on}
             onClick={() => choose(o.k)}
-            className={`flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
+            className={`flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
               on ? "bg-orange text-ink shadow-[0_2px_0_var(--shadow)]" : "text-on-muted hover:bg-stage-3 hover:text-on"
             }`}
           >

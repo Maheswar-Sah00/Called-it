@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PRESETS, SPORT_ART, type RoomState, type Sport } from "@/lib/game";
 import { api } from "@/lib/client/session";
 import { Art } from "@/components/ui";
+import { HOST_SCORE_KEY } from "./HostBar";
 
 const TIMERS = [0, 10, 20, 30, 60];
 
@@ -32,6 +33,33 @@ export function HostPanel({
   const m = st.moment;
   const live = m && m.state !== "settled";
 
+  // the phone bar sends the score line with its actions
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`${HOST_SCORE_KEY}:${id}`, score);
+    } catch {
+      /* private mode */
+    }
+  }, [id, score]);
+
+  async function invite() {
+    const url = `${location.origin}/r/${id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Called It", text: `Come call ${st.room.name} with us on Called It`, url });
+        return;
+      } catch {
+        /* copy instead */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Room link copied. Send it to your group.", "mint");
+    } catch {
+      toast(url);
+    }
+  }
+
   async function act(action: string, extra: Record<string, unknown> = {}) {
     setBusy(action);
     const r = await api(`/api/rooms/${id}/host`, { action, scoreline: score || undefined, ...extra });
@@ -42,22 +70,44 @@ export function HostPanel({
   }
 
   return (
-    <section className="brut-lg rounded-[24px] bg-paper p-5 text-ink sm:p-6">
+    <section className="brut-lg rounded-[24px] bg-paper p-4 text-ink sm:p-6">
       <div className="flex items-center gap-3">
-        <Art src={SPORT_ART[sport].official} className="h-16 w-16" />
-        <div>
-          <h3 className="font-display text-2xl font-extrabold">Host controls</h3>
+        <Art src={SPORT_ART[sport].official} className="h-12 w-12 shrink-0 sm:h-16 sm:w-16" />
+        <div className="min-w-0">
+          <h3 className="font-display text-xl font-extrabold sm:text-2xl">Host controls</h3>
           <p className="text-sm text-muted">You ask, you lock, you call the result. The server keeps everyone honest.</p>
         </div>
       </div>
 
-      {live && (
-        <p className="mt-4 rounded-xl border-2 border-dashed border-ink/25 p-3 text-sm text-muted lg:hidden">
-          Lock and call the result from the bar at the bottom of your screen.
-        </p>
-      )}
+      {/* phones: the pinned bar runs the moment; this card explains it and holds the extras */}
+      <div className="mt-4 grid gap-3 lg:hidden">
+        <ol className="grid grid-cols-3 gap-1.5 text-center text-xs font-bold">
+          {(
+            [
+              ["b2/megaphone", "1 · Ask", "Pick a question, tap Go"],
+              ["b2/lock", "2 · Lock", "The second it happens"],
+              ["b2/check", "3 · Call it", "Tap what happened"],
+            ] as const
+          ).map(([a, t, d]) => (
+            <li key={t} className="rounded-xl border-2 border-ink/20 bg-cream/60 px-1 py-2">
+              <Art src={a} className="mx-auto h-8 w-8" />
+              <p className="mt-1 font-extrabold">{t}</p>
+              <p className="mt-0.5 font-semibold leading-tight text-muted">{d}</p>
+            </li>
+          ))}
+        </ol>
+        <label className="grid gap-1 text-xs font-bold uppercase tracking-wider">
+          Score line (optional, sent with your next tap)
+          <input className="input !min-h-11 !py-2 text-[16px] normal-case tracking-normal" placeholder="e.g. IND 182/4 · 18.2 ov" value={score} maxLength={60} onChange={(e) => setScore(e.target.value)} />
+        </label>
+        <button className="key key-paper !min-h-12 w-full" onClick={invite}>
+          <Art src="b2/foam-finger" className="h-6 w-6" /> Invite friends to this room
+        </button>
+        <p className="text-xs text-muted">To mute someone, open the Table tab and tap Mute next to their name.</p>
+      </div>
+
       {!live ? (
-        <div className="rise mt-5">
+        <div className="rise mt-5 max-lg:hidden">
           <p className="text-xs font-bold uppercase tracking-wider">1 · Pick the moment</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {presets.map((p) => (

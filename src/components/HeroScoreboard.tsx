@@ -66,7 +66,7 @@ export function HeroScoreboard() {
   const total = s.votes.reduce((a, b) => a + b, 0) + (picked ? 1 : 0);
 
   return (
-    <div className="relative mx-auto w-full max-w-[34rem]">
+    <div className="relative mx-auto mb-8 w-full max-w-[34rem] sm:mb-10">
       {/* stand legs */}
       <div className="absolute -bottom-10 left-[22%] h-12 w-4 border-2 border-ink bg-night-3" />
       <div className="absolute -bottom-10 right-[22%] h-12 w-4 border-2 border-ink bg-night-3" />
@@ -125,7 +125,7 @@ export function HeroScoreboard() {
                   <span className="flex -space-x-2">
                     {Array.from({ length: Math.min(v, 3) }).map((_, f) =>
                       isPick && f === 0 ? (
-                        <span key={f} className="grid h-5 w-5 place-items-center rounded-full border border-ink bg-yellow text-[8px] font-black text-ink">
+                        <span key={f} className="grid h-6 w-6 place-items-center rounded-full border border-ink bg-yellow text-[9px] font-black text-ink">
                           YOU
                         </span>
                       ) : (
@@ -154,19 +154,19 @@ export function HeroScoreboard() {
         {/* overlays */}
         {phase === "locked" && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <Art src="d2/locked" className="stamp w-56 sm:w-64" />
+            <span className="stamp font-arcade inline-flex items-center gap-2 rounded-2xl border-[3px] border-ink bg-red px-4 py-2 text-3xl text-white shadow-[5px_5px_0_var(--shadow)] sm:text-4xl"><Art src="b2/lock" className="h-9 w-9 sm:h-11 sm:w-11" /> LOCKED</span>
           </div>
         )}
         {phase === "result" && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <Art key={i} src={s.sticker} className="pop-in w-56 drop-shadow-[6px_6px_0_rgba(0,0,0,.4)] sm:w-72" />
+            <Art key={i} src={s.sticker} className="pop-in w-48 drop-shadow-[6px_6px_0_rgba(0,0,0,.4)] sm:w-72" />
           </div>
         )}
       </div>
 
       {/* tap cursor */}
       {phase === "open" && t > 1500 && t < 2600 && (
-        <Art src="b2/foam-finger" className="pop-in pointer-events-none absolute left-[44%] top-[58%] z-10 w-14 rotate-[-18deg]" />
+        <Art src="b2/foam-finger" className="pop-in pointer-events-none absolute left-[44%] top-[58%] z-10 w-11 rotate-[-18deg] sm:w-14" />
       )}
     </div>
   );

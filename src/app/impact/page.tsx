@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client/session";
 import { Art, Brand } from "@/components/ui";
@@ -31,29 +32,45 @@ export default function ImpactPage() {
 
   return (
     <main className="min-h-screen pb-20">
-      <div className="flood pb-20">
+      <div className="flood pb-16 sm:pb-20">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-5">
           <Brand />
           <ThemeToggle />
         </div>
-        <div className="mx-auto max-w-6xl px-4 pt-12">
-          <p className="font-led text-2xl text-orange">THE SCOREBOARD THAT MATTERS</p>
-          <h1 className="font-arcade text-5xl">Live impact</h1>
+        <div className="mx-auto max-w-6xl px-4 pt-8 sm:pt-12">
+          <p className="font-led text-xl text-orange sm:text-2xl">THE SCOREBOARD THAT MATTERS</p>
+          <h1 className="font-arcade text-4xl sm:text-5xl">Live impact</h1>
           <p className="mt-2 max-w-xl text-on-muted">
             Real people, real rooms. Demo rooms and bots are never counted. Refreshes every 10 seconds.
           </p>
         </div>
       </div>
-      <div className="mx-auto -mt-10 grid max-w-6xl grid-cols-2 gap-3 px-4 sm:gap-5 lg:grid-cols-5">
+      <div className="mx-auto -mt-12 grid max-w-6xl grid-cols-2 gap-3 px-4 sm:-mt-10 sm:gap-5 lg:grid-cols-5">
         {tiles.map((t, i) => (
-          <div key={t.k} className={`brut lift rise rounded-3xl ${t.bg} p-4 text-ink sm:p-5 ${i === 4 ? "col-span-2 lg:col-span-1" : ""}`} style={{ animationDelay: `${i * 60}ms` }}>
-            <Art src={t.art} className="h-10 w-10 rounded-full sm:h-14 sm:w-14" />
-            <p className="font-led mt-2 text-5xl leading-none sm:mt-3 sm:text-7xl">{t.v ?? (failed ? "–" : "…")}</p>
-            <p className="mt-1 text-sm font-bold">{t.k}</p>
+          <div key={t.k} className={`brut lift rise rounded-3xl ${t.bg} p-3.5 text-ink sm:p-5 ${i === 4 ? "col-span-2 lg:col-span-1" : ""}`} style={{ animationDelay: `${i * 60}ms` }}>
+            <div className="flex items-center gap-2 sm:block">
+              <Art src={t.art} className="h-9 w-9 shrink-0 rounded-full sm:h-14 sm:w-14" />
+              <p className="font-led min-w-0 truncate text-[2.4rem] leading-none sm:mt-3 sm:text-7xl">{t.v ?? (failed ? "–" : "…")}</p>
+            </div>
+            <p className="mt-1.5 text-sm font-bold leading-tight">{t.k}</p>
           </div>
         ))}
       </div>
-      <p className="mx-auto mt-8 max-w-6xl px-4 text-xs text-on-muted">
+      <div className="mx-auto mt-8 max-w-6xl px-4">
+        <div className="brut flex flex-col gap-3 rounded-3xl bg-stage-2 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-center gap-3">
+            <Art src="b2/stopwatch" className="h-12 w-12 shrink-0" />
+            <div>
+              <p className="font-display text-lg font-extrabold leading-tight">See what they&apos;re playing</p>
+              <p className="text-sm text-on-muted">Call the 2024 T20 World Cup final, ball by ball. No sign-up. (Demo rooms never count here.)</p>
+            </div>
+          </div>
+          <Link href="/try" className="key min-h-12 w-full text-base sm:w-auto">
+            Try the 60-second demo
+          </Link>
+        </div>
+      </div>
+      <p className="mx-auto mt-6 max-w-6xl px-4 text-xs text-on-muted">
         {d ? `Updated ${new Date(d.at).toLocaleTimeString()}` : failed ? "Couldn't load the numbers. Retrying every 10 seconds." : "Loading…"} · Counted on the server from Nexconn tokens issued and calls accepted.
       </p>
     </main>

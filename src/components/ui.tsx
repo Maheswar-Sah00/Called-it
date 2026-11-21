@@ -61,8 +61,8 @@ export function Wordmark({ className = "", size = "text-7xl", stacked = true }: 
 export function Brand() {
   return (
     <Link href="/" className="group inline-flex items-center gap-2.5">
-      <span className="grid h-10 w-10 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_var(--shadow)] transition-transform group-hover:-rotate-6 group-hover:scale-105">
-        <Art src="b3/pumped" className="h-8 w-8" />
+      <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_var(--shadow)] transition-transform group-hover:-rotate-6 group-hover:scale-105">
+        <Art src="b3/pumped" className="h-9 w-9" />
       </span>
       <span className="wm-small whitespace-nowrap text-xl max-[420px]:hidden sm:text-2xl">CALLED IT!</span>
     </Link>
@@ -134,19 +134,30 @@ export function Modal({ open, onClose, children, wide = false }: { open: boolean
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
+    // lock the page behind the sheet so swipes never scroll the landing underneath
+    const html = document.documentElement;
+    const prev = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", k);
+      html.style.overflow = prev;
+    };
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-[3px] sm:items-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overscroll-contain bg-black/70 p-2 backdrop-blur-[3px] sm:items-center sm:p-3"
+      onClick={onClose}
+    >
       <div
-        className={`rise brut-lg relative max-h-[92vh] w-full overflow-y-auto rounded-[22px] bg-paper p-6 text-ink ${wide ? "max-w-2xl" : "max-w-md"}`}
+        className={`rise brut-lg modal-sheet relative max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-[22px] bg-paper p-5 pt-6 text-ink sm:max-h-[92vh] sm:p-6 ${wide ? "max-w-2xl" : "max-w-md"}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal
+        data-scroll
       >
         <div className="absolute inset-x-0 top-0 h-2 rounded-t-[19px] bg-[repeating-linear-gradient(90deg,var(--orange)_0_18px,var(--yellow)_18px_36px)]" />
-        <button onClick={onClose} className="key key-paper key-sm !absolute right-4 top-5 !h-9 !w-9 !p-0 text-lg" aria-label="Close">
+        <button onClick={onClose} className="key key-paper key-sm !absolute right-3 top-4 z-20 !h-11 !w-11 !p-0 text-xl sm:right-4 sm:top-5" aria-label="Close">
           ×
         </button>
         {children}

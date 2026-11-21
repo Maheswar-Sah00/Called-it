@@ -573,6 +573,241 @@ body {
   }
 }
 
+/* landing-agent */
+/* sheet footer clears the home indicator on notched phones */
+.sheet-foot {
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  .sheet-foot {
+    padding-bottom: 1.5rem;
+  }
+}
+/* momentum scrolling inside sheets and chip rows */
+.modal-sheet {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+/* phone thumb bar: slides up once the hero has gone */
+.thumb-bar {
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.2s ease;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+.thumb-bar[data-show="false"] {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+/* end landing-agent */
+
+/* host-agent */
+/* Host thumb bar (phones): sits above the tab bar and the home indicator. */
+.hostbar {
+  bottom: calc(4.9rem + env(safe-area-inset-bottom, 0px));
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: bottom 0.18s ease;
+}
+.hb-in {
+  animation: rise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.hb-step {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 0.05rem 0.4rem;
+  font-family: var(--font-led), ui-monospace, monospace;
+  font-size: 0.85rem;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--muted);
+  border: 1.5px dashed rgba(20, 11, 8, 0.28);
+}
+.hb-step-on {
+  background: var(--ink);
+  color: var(--paper);
+  border: 1.5px solid var(--ink);
+}
+.hb-step-done {
+  border-style: solid;
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.hb-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.25rem;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 0 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 3px 0 var(--shadow);
+  position: relative;
+}
+.hb-mini::after {
+  /* 44px touch area without a taller look */
+  content: "";
+  position: absolute;
+  inset: -4px -2px;
+}
+.hb-mini:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--shadow);
+}
+.hb-count {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  min-width: 1.35rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--font-led), ui-monospace, monospace;
+  font-size: 0.85rem;
+  line-height: 1.1;
+  padding: 0 0.25rem;
+}
+.hb-seg {
+  flex-basis: 0;
+  transition: flex-grow 0.35s ease;
+}
+.hb-seg + .hb-seg {
+  border-left: 2px solid var(--ink);
+}
+.hb-seg-0 {
+  background: var(--orange);
+}
+.hb-seg-1 {
+  background: var(--lime);
+}
+.hb-seg-2 {
+  background: var(--pink);
+}
+.hb-seg-3 {
+  background: var(--yellow);
+}
+.hb-chips {
+  scroll-snap-type: x proximity;
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 22px), transparent);
+}
+.hb-chips > * {
+  scroll-snap-align: start;
+}
+:root[data-theme="day"] .hb-step {
+  border-color: rgba(43, 23, 17, 0.25);
+}
+@media (max-width: 1023.98px) {
+  /* the room pads itself under the bar, and toasts float above it (!important: utilities sit in a later layer) */
+  body:has([data-hostbar]) main {
+    padding-bottom: calc(var(--hostbar-h, 0px) + 7rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  body:has([data-hostbar]) .pointer-events-none.fixed.bottom-24 {
+    bottom: calc(var(--hostbar-h, 0px) + 6rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* room-agent: phone room (tab bar, answer keys, chat, celebration) */
+.ra-tabbar {
+  bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+.ra-pad {
+  /* tab bar (4rem) + its gap + breathing room + the home-indicator inset */
+  padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 1023.98px) {
+  body:has(.ra-tabbar) .pointer-events-none.fixed.bottom-24 {
+    bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+.ra-key {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+.ra-key:active:not(:disabled) {
+  transform: translateY(5px) scale(0.985);
+  box-shadow: 0 1px 0 var(--shadow);
+}
+.ra-badge {
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 2.6rem);
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--red);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1rem;
+  text-align: center;
+}
+.ra-chatlist {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.ra-strip {
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+}
+.ra-chat {
+  height: calc(var(--ra-vvh, 100dvh) - var(--ra-top, 4.5rem) - 7.5rem - env(safe-area-inset-bottom, 0px));
+}
+.ra-chat.ra-kb {
+  height: calc(var(--ra-vvh, 100dvh) - var(--ra-top, 4.5rem) - 1.25rem);
+}
+@media (min-width: 1024px) {
+  .ra-chat,
+  .ra-chat.ra-kb {
+    height: 36rem;
+  }
+}
+@keyframes ra-nudge {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+.ra-nudge {
+  animation: ra-nudge 1s ease-in-out infinite;
+}
+@keyframes ra-points {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.ra-points {
+  animation: ra-points 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ra-confetti {
+    display: none;
+  }
+  .ra-key:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 
 }
 

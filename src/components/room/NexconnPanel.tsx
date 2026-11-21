@@ -30,29 +30,44 @@ export function NexconnPanel({
   const [open, setOpen] = useState(false);
   const [logs, setLogs] = useState<LogLine[]>([]);
   useEffect(() => onLogs(setLogs), []);
+  // phones open it from the Table tab (no floating button over the tab bar)
+  useEffect(() => {
+    const t = () => setOpen((o) => !o);
+    window.addEventListener("ci:nexconn", t);
+    return () => window.removeEventListener("ci:nexconn", t);
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [open]);
 
   return (
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="brut-sm fixed bottom-4 left-4 z-40 max-lg:!hidden max-lg:bottom-[5.6rem] flex items-center gap-2 rounded-full bg-night px-4 py-2 text-xs font-bold text-white transition-transform hover:-translate-y-1"
+        className="brut-sm fixed bottom-4 left-4 z-40 hidden items-center gap-2 rounded-full bg-night px-4 py-2 text-xs font-bold text-white transition-transform hover:-translate-y-1 lg:flex"
       >
         <span className={`h-2.5 w-2.5 rounded-full ${live === "live" ? "bg-lime" : "bg-[#888]"}`} />
-        <span className="hidden sm:inline">Nexconn inside</span>
-        <span className="sm:hidden">N</span>
+        <span>Nexconn inside</span>
       </button>
+      {open && <button aria-label="Close Nexconn panel" className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />}
       <aside
-        className={`fixed bottom-16 left-4 z-40 max-lg:bottom-[8.6rem] w-[min(26rem,calc(100vw-2rem))] origin-bottom-left transition-all duration-300 ${
-          open ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"
+        className={`fixed bottom-16 left-4 z-50 w-[min(26rem,calc(100vw-2rem))] origin-bottom-left transition-all duration-300 max-lg:bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] max-lg:left-1/2 max-lg:-translate-x-1/2 max-lg:origin-bottom ${
+          open ? "scale-100 opacity-100" : "pointer-events-none invisible scale-90 opacity-0"
         }`}
       >
-        <div className="brut-lg max-h-[70vh] overflow-y-auto rounded-3xl bg-night p-5 text-white scroll-thin">
+        <div className="brut-lg max-h-[min(70vh,calc(100dvh-11rem))] overflow-y-auto overscroll-contain rounded-3xl bg-night p-5 text-white scroll-thin">
           <div className="flex items-center gap-2">
             <Art src="b2/scoreboard" className="h-9 w-9" />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-display text-lg font-extrabold">Nexconn inside</p>
-              <p className="font-mono text-[11px] text-white/60">{channelId ?? "…"}</p>
+              <p className="truncate font-mono text-[11px] text-white/60">{channelId ?? "…"}</p>
             </div>
+            <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-white/25 text-lg font-bold hover:bg-white/10">
+              <Art src="b2/cross" className="h-6 w-6" />
+            </button>
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2 text-center">
             {[
