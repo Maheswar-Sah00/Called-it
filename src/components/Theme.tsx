@@ -93,7 +93,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   ];
   return (
     <div
-      className={`inline-flex items-center gap-1 rounded-xl border-2 border-ink bg-stage-2 p-1 shadow-[0_3px_0_#000] ${className}`}
+      className={`inline-flex items-center gap-1 rounded-xl border-2 border-ink bg-stage-2 p-1 shadow-[0_3px_0_var(--shadow)] ${className}`}
       role="radiogroup"
       aria-label="Theme"
       title={pref === "auto" ? `Auto: ${theme} by your local time` : `${pref} mode`}
@@ -107,7 +107,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
             aria-checked={on}
             onClick={() => choose(o.k)}
             className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
-              on ? "bg-orange text-ink shadow-[0_2px_0_#000]" : "text-on-muted hover:bg-stage-3 hover:text-on"
+              on ? "bg-orange text-ink shadow-[0_2px_0_var(--shadow)]" : "text-on-muted hover:bg-stage-3 hover:text-on"
             }`}
           >
             <Icon k={o.k} />

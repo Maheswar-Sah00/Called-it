@@ -108,13 +108,13 @@ export default function Home() {
         <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-4 pt-12 lg:grid-cols-[1.05fr_1fr] lg:pt-16">
           <div>
             <div className="flex flex-wrap gap-2.5">
-              <span className="led inline-flex items-center gap-2 rounded-lg px-3 py-1 !shadow-[0_3px_0_#000]">
+              <span className="led inline-flex items-center gap-2 rounded-lg px-3 py-1 !shadow-[0_3px_0_var(--shadow)]">
                 <span className="live-dot" />
                 <span className="font-led led-text text-lg">MATCHDAY · POINTS ONLY</span>
               </span>
               <a
                 href="#nexconn"
-                className="inline-flex items-center gap-2 rounded-lg border-2 border-ink bg-paper px-3 py-1 text-ink shadow-[0_3px_0_#000] transition-transform hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 rounded-lg border-2 border-ink bg-paper px-3 py-1 text-ink shadow-[0_3px_0_var(--shadow)] transition-transform hover:-translate-y-0.5"
               >
                 <span className="font-led text-lg">BUILT FOR THE NEXCONN BUILD CHALLENGE 2026</span>
                 <span className="font-led rounded bg-orange px-1 text-lg">→</span>
@@ -178,7 +178,7 @@ export default function Home() {
               className="group rise text-left transition-transform duration-300 hover:z-10 hover:-translate-y-2 hover:rotate-0"
               style={{ animationDelay: `${i * 40}ms`, transform: `rotate(${i % 2 ? 1.6 : -1.6}deg)` }}
             >
-              <div className="drop-shadow-[5px_6px_0_#000]">
+              <div className="drop-shadow-[5px_6px_0_var(--shadow)]">
                 <div className="ticket">
                   <div className={`relative grid h-32 place-items-center overflow-hidden rounded-t-[18px] border-b-[2.5px] border-ink ${BAND[s]}`}>
                     <span className="font-led absolute left-2.5 top-1.5 text-base text-ink/60">ADMIT ALL</span>
@@ -192,7 +192,7 @@ export default function Home() {
                   <div className="perf mx-3 mt-2" />
                   <div className="flex items-center justify-between px-3.5 py-2.5">
                     <span className="font-led text-lg text-muted">GATE {String.fromCharCode(65 + i)}</span>
-                    <span className="rounded-lg border-2 border-ink bg-orange px-2.5 py-0.5 text-xs font-extrabold shadow-[0_3px_0_#000] transition-transform group-hover:translate-x-1">
+                    <span className="rounded-lg border-2 border-ink bg-orange px-2.5 py-0.5 text-xs font-extrabold shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:translate-x-1">
                       Enter →
                     </span>
                   </div>
@@ -205,7 +205,7 @@ export default function Home() {
 
       {/* ================= HOUSE RULES: tactics board ================= */}
       <section className="px-4 py-6">
-        <div className="chalkboard relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border-[3px] border-ink p-6 text-paper shadow-[8px_8px_0_#000] sm:p-10">
+        <div className="chalkboard relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border-[3px] border-ink p-6 text-paper shadow-[8px_8px_0_var(--shadow)] sm:p-10">
           <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.16]" viewBox="0 0 800 400" preserveAspectRatio="none" aria-hidden>
             <rect x="20" y="20" width="760" height="360" fill="none" stroke="#fff" strokeWidth="3" />
             <line x1="400" y1="20" x2="400" y2="380" stroke="#fff" strokeWidth="3" />
@@ -235,7 +235,7 @@ export default function Home() {
               ].map((r, i) => (
                 <div
                   key={r.n}
-                  className={`group flex items-center gap-4 rounded-2xl border-[2.5px] border-ink ${r.c} p-4 text-ink shadow-[5px_5px_0_#000] transition-transform duration-200 hover:-translate-y-1 hover:rotate-[-0.6deg] ${i === 1 ? "lg:ml-10" : i === 2 ? "lg:ml-4" : ""}`}
+                  className={`group flex items-center gap-4 rounded-2xl border-[2.5px] border-ink ${r.c} p-4 text-ink shadow-[5px_5px_0_var(--shadow)] transition-transform duration-200 hover:-translate-y-1 hover:rotate-[-0.6deg] ${i === 1 ? "lg:ml-10" : i === 2 ? "lg:ml-4" : ""}`}
                 >
                   <span className="font-led text-4xl text-ink/40">{r.n}</span>
                   <div className="flex-1">
@@ -261,7 +261,7 @@ export default function Home() {
             {OVER.map((b, i) => (
               <div key={b.t} className="group relative flex flex-col items-start lg:items-center lg:text-center">
                 <div
-                  className={`relative grid h-16 w-16 place-items-center rounded-full border-[3px] border-ink text-2xl font-black shadow-[0_5px_0_#000] transition-all duration-200 group-hover:-translate-y-2 group-hover:rotate-[24deg] ${
+                  className={`relative grid h-16 w-16 place-items-center rounded-full border-[3px] border-ink text-2xl font-black shadow-[0_5px_0_var(--shadow)] transition-all duration-200 group-hover:-translate-y-2 group-hover:rotate-[24deg] ${
                     b.hot ? "bg-red text-white" : b.win ? "bg-lime text-ink" : "bg-[radial-gradient(circle_at_35%_30%,#ff8a6b,#c8321f_70%)] text-paper"
                   }`}
                 >
@@ -304,7 +304,7 @@ export default function Home() {
             {/* antenna */}
             <div className="absolute -top-14 left-1/2 h-16 w-1 origin-bottom -translate-x-6 -rotate-[28deg] rounded bg-ink" />
             <div className="absolute -top-14 left-1/2 h-16 w-1 origin-bottom translate-x-6 rotate-[28deg] rounded bg-ink" />
-            <div className="relative rounded-[30px] border-[3px] border-ink bg-[#a0522d] p-4 shadow-[8px_8px_0_#000] sm:p-5">
+            <div className="relative rounded-[30px] border-[3px] border-ink bg-[#a0522d] p-4 shadow-[8px_8px_0_var(--shadow)] sm:p-5">
               <div className="flex gap-4">
                 <div className="scanlines relative aspect-[4/3] flex-1 overflow-hidden rounded-[22px] border-[3px] border-ink bg-black">
                   <Art key={ch} src={CHANNELS[ch].a} className="rise h-full w-full object-cover" />
@@ -317,7 +317,7 @@ export default function Home() {
                     <button
                       key={k}
                       onClick={() => flip((ch + (k ? 3 : 1)) % 4)}
-                      className="h-12 w-12 rounded-full border-[3px] border-ink bg-[radial-gradient(circle_at_35%_30%,#ffe7b0,#c8913f)] shadow-[0_4px_0_#000] transition-transform hover:rotate-45 active:translate-y-1 active:shadow-none"
+                      className="h-12 w-12 rounded-full border-[3px] border-ink bg-[radial-gradient(circle_at_35%_30%,#f6dccf,#b5694d)] shadow-[0_4px_0_var(--shadow)] transition-transform hover:rotate-45 active:translate-y-1 active:shadow-none"
                       aria-label={k ? "Previous channel" : "Next channel"}
                     />
                   ))}
@@ -357,7 +357,7 @@ export default function Home() {
             ].map((p, i) => (
               <div
                 key={p.t}
-                className={`group relative rounded-2xl border-[3px] ${p.c} bg-night-2 p-4 shadow-[0_6px_0_#000] transition-all duration-200 hover:-translate-y-2 hover:bg-night-3 ${i % 2 ? "md:mt-8" : ""}`}
+                className={`group relative rounded-2xl border-[3px] ${p.c} bg-night-2 p-4 shadow-[0_6px_0_var(--shadow)] transition-all duration-200 hover:-translate-y-2 hover:bg-night-3 ${i % 2 ? "md:mt-8" : ""}`}
               >
                 <span className="font-led absolute right-3 top-2 text-xl text-paper/50 group-hover:blink">{p.k}</span>
                 <Art src={p.art} className="h-20 w-20 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-12" />
@@ -387,7 +387,7 @@ export default function Home() {
         </div>
         <div className="mt-10 grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
           {/* formation */}
-          <div className="turf relative aspect-[4/5] overflow-hidden rounded-[24px] border-[3px] border-ink shadow-[8px_8px_0_#000]">
+          <div className="turf relative aspect-[4/5] overflow-hidden rounded-[24px] border-[3px] border-ink shadow-[8px_8px_0_var(--shadow)]">
             <svg viewBox="0 0 100 125" className="absolute inset-0 h-full w-full" aria-hidden>
               <rect x="5" y="5" width="90" height="115" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth=".8" />
               <line x1="5" y1="62.5" x2="95" y2="62.5" stroke="#fff" strokeOpacity=".55" strokeWidth=".8" />
@@ -399,7 +399,7 @@ export default function Home() {
               <a
                 key={p.k}
                 href={`#nx-${i + 1}`}
-                className="group absolute grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[2.5px] border-ink bg-orange font-arcade text-sm text-ink shadow-[0_3px_0_#000] transition-transform hover:z-10 hover:scale-125"
+                className="group absolute grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[2.5px] border-ink bg-orange font-arcade text-sm text-ink shadow-[0_3px_0_var(--shadow)] transition-transform hover:z-10 hover:scale-125"
                 style={{ left: `${p.x}%`, top: `${p.y}%` }}
                 title={p.k}
               >

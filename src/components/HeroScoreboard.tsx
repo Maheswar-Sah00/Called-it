@@ -114,7 +114,7 @@ export function HeroScoreboard() {
                 className={`relative overflow-hidden rounded-xl border-2 border-ink px-3 py-2 transition-all duration-300 ${
                   isResult ? "bg-lime text-ink" : isPick ? "bg-orange text-ink" : "bg-night-3 text-paper"
                 } ${phase !== "open" && !isResult && !isPick ? "opacity-40" : ""}`}
-                style={{ boxShadow: isPick || isResult ? "0 2px 0 #000" : "0 4px 0 #000", transform: isPick ? "translateY(2px)" : undefined }}
+                style={{ boxShadow: isPick || isResult ? "0 2px 0 var(--shadow)" : "0 4px 0 var(--shadow)", transform: isPick ? "translateY(2px)" : undefined }}
               >
                 <div
                   className="absolute inset-y-0 left-0 bg-white/15 transition-[width] duration-700"

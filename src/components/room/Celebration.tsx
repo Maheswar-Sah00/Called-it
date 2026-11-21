@@ -19,7 +19,7 @@ const OUTCOME_STICKER: Record<string, string> = {
   yes: "d2/clutch",
 };
 
-const CONFETTI = ["#ffe45c", "#ff6fb5", "#3ddc97", "#b9a3ff", "#ff4d3d", "#2f55e4"];
+const CONFETTI = ["var(--orange)", "var(--pink)", "var(--lime)", "var(--yellow)", "var(--red)", "var(--paper)"];
 
 /** Full-screen sticker moment when a result lands (after any spoiler delay). */
 export function Celebration({ c }: { c: Celebrate }) {
@@ -36,7 +36,7 @@ export function Celebration({ c }: { c: Celebrate }) {
               left: `${(i * 37) % 100}%`,
               background: CONFETTI[i % CONFETTI.length],
               animation: `confetti-fall ${1.6 + (i % 7) * 0.18}s ${(i % 9) * 0.05}s cubic-bezier(.3,.6,.5,1) forwards`,
-              border: "1.5px solid #111",
+              border: "1.5px solid var(--ink)",
             }}
           />
         ))}

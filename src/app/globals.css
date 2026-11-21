@@ -27,6 +27,7 @@
   --k-rose: #ffc6d6;
   --k-sand: #f6dcb6;
   --k-lime: #e5f6a6;
+  --shadow: #000;
 
   /* themed stage (night is the default; day overrides below) */
   --stage: #1f120d;
@@ -37,18 +38,68 @@
   --line: rgba(255, 247, 232, 0.14);
   --glow-a: rgba(255, 228, 160, 0.16);
   --glow-b: rgba(255, 122, 26, 0.18);
+  --led-bg: #120a07;
+  --led-dot: rgba(255, 210, 63, 0.09);
+  --led-rim: #3e2619;
+  --led-glow: 0 0 6px rgba(255, 210, 63, 0.55), 0 0 18px rgba(255, 122, 26, 0.35);
+  --wm-edge: #000;
+  --wm-fill: linear-gradient(180deg, #fffbe6 0%, #ffe27a 28%, #ffc23a 55%, #ff7a1a 85%, #f05a22 100%);
 }
 
-/* Day: a sunny matchday afternoon. */
+/* Day = "Clay court": one premium terracotta family on porcelain. No yellow. */
 :root[data-theme="day"] {
-  --stage: #ffe6c2;
-  --stage-2: #fff3df;
-  --stage-3: #f7d6a8;
-  --on: #140b08;
-  --on-muted: #6e5a4c;
-  --line: rgba(20, 11, 8, 0.14);
-  --glow-a: rgba(255, 255, 255, 0.55);
-  --glow-b: rgba(255, 166, 61, 0.35);
+  --stage: #f6efea; /* porcelain */
+  --stage-2: #fcf9f6;
+  --stage-3: #eee2da;
+  --on: #2b1711; /* cocoa ink */
+  --on-muted: #86685c;
+  --line: rgba(43, 23, 17, 0.12);
+  --glow-a: rgba(255, 255, 255, 0.7);
+  --glow-b: rgba(196, 88, 58, 0.14);
+
+  --ink: #2b1711;
+  --shadow: #2b1711;
+  --paper: #fffdfb;
+  --cream: #f6ebe4;
+  --sand: #ead8cd;
+  --muted: #86685c;
+
+  --orange: #c4583a; /* clay: the one accent */
+  --orange-d: #9c4127;
+  --yellow: #e9b9a6; /* light clay (replaces every yellow) */
+  --red: #8f2f1c; /* deep clay for LOCK */
+  --lime: #e7a58e; /* "right" in clay */
+  --pink: #f0cfc2;
+  --turf: #c76447; /* the pitch becomes a clay court */
+  --turf-2: #d0704f;
+  --chalk: #7d3a27;
+
+  --k-peach: #f6e2d8;
+  --k-butter: #f8ece6;
+  --k-leaf: #f1dbd0;
+  --k-rose: #f3dfd8;
+  --k-sand: #eee1d8;
+  --k-lime: #f5e7e0;
+
+  --led-bg: #2b1711;
+  --led-dot: rgba(233, 185, 166, 0.1);
+  --led-rim: #4a2a20;
+  --led-glow: 0 0 8px rgba(233, 185, 166, 0.35);
+  --wm-edge: #2b1711;
+  --wm-fill: linear-gradient(180deg, #fff8f4 0%, #f3cdbd 30%, #dc8a6c 60%, #c4583a 85%, #9c4127 100%);
+}
+:root[data-theme="day"] .flood {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% -10%, rgba(196, 88, 58, 0.16), transparent 70%),
+    radial-gradient(circle at 88% 8%, rgba(255, 255, 255, 0.9), transparent 260px),
+    var(--stage);
+}
+:root[data-theme="day"] .paper {
+  background-color: var(--paper);
+  background-image: none;
+}
+:root[data-theme="day"] .live-dot {
+  background: var(--orange);
 }
 :root[data-theme="day"] .night-only {
   display: none !important;
@@ -120,29 +171,29 @@ body {
 }
 .led-text {
   color: var(--yellow);
-  text-shadow: 0 0 6px rgba(255, 210, 63, 0.55), 0 0 18px rgba(255, 122, 26, 0.35);
+  text-shadow: var(--led-glow);
 }
 
 /* ---------- surfaces ---------- */
 .brut {
   border: 2.5px solid var(--ink);
-  box-shadow: 5px 5px 0 #000;
+  box-shadow: 5px 5px 0 var(--shadow);
 }
 .brut-sm {
   border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 #000;
+  box-shadow: 3px 3px 0 var(--shadow);
 }
 .brut-lg {
   border: 3px solid var(--ink);
-  box-shadow: 8px 8px 0 #000;
+  box-shadow: 8px 8px 0 var(--shadow);
 }
 /* LED dot-matrix panel */
 .led {
-  background-color: #120a07;
-  background-image: radial-gradient(rgba(255, 210, 63, 0.09) 1.1px, transparent 1.3px);
+  background-color: var(--led-bg);
+  background-image: radial-gradient(var(--led-dot) 1.1px, transparent 1.3px);
   background-size: 6px 6px;
-  border: 3px solid #000;
-  box-shadow: inset 0 0 0 3px #3e2619, 6px 6px 0 #000;
+  border: 3px solid var(--ink);
+  box-shadow: inset 0 0 0 3px var(--led-rim), 6px 6px 0 var(--shadow);
 }
 /* CRT scanlines */
 .scanlines {
@@ -196,7 +247,7 @@ body {
 /* ---------- buttons ---------- */
 /* Arcade keycap: a thick bottom edge that you press into. */
 .key {
-  --edge: #000;
+  --edge: var(--shadow);
   --face: var(--orange);
   position: relative;
   display: inline-flex;
@@ -269,7 +320,7 @@ body {
 }
 .lift:hover {
   transform: translate(-3px, -4px) rotate(-0.6deg);
-  box-shadow: 9px 10px 0 #000;
+  box-shadow: 9px 10px 0 var(--shadow);
 }
 
 .chip {
@@ -283,17 +334,17 @@ body {
   font-size: 0.8rem;
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 3px 0 #000;
+  box-shadow: 0 3px 0 var(--shadow);
   transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.12s ease;
   cursor: pointer;
 }
 .chip:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 0 #000;
+  box-shadow: 0 4px 0 var(--shadow);
 }
 .chip:active {
   transform: translateY(2px);
-  box-shadow: 0 1px 0 #000;
+  box-shadow: 0 1px 0 var(--shadow);
 }
 .chip[data-on="true"] {
   background: var(--orange);
@@ -331,14 +382,14 @@ body {
   display: block;
 }
 .wm-back {
-  color: #000;
-  -webkit-text-stroke: 0.17em #000;
+  color: var(--wm-edge);
+  -webkit-text-stroke: 0.17em var(--wm-edge);
   text-shadow:
-    0.02em 0.03em 0 #000,
-    0.04em 0.06em 0 #000,
-    0.06em 0.09em 0 #000,
-    0.08em 0.12em 0 #000,
-    0.1em 0.15em 0 #000;
+    0.02em 0.03em 0 var(--wm-edge),
+    0.04em 0.06em 0 var(--wm-edge),
+    0.06em 0.09em 0 var(--wm-edge),
+    0.08em 0.12em 0 var(--wm-edge),
+    0.1em 0.15em 0 var(--wm-edge);
 }
 .wm-rim {
   color: var(--red);
@@ -347,7 +398,7 @@ body {
 .wm-front {
   background:
     linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.95) 46%, transparent 54%) -160% 0 / 260% 100% no-repeat,
-    linear-gradient(180deg, #fffbe6 0%, #ffe27a 28%, #ffc23a 55%, var(--orange) 85%, #f05a22 100%);
+    var(--wm-fill);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -366,9 +417,9 @@ body {
 .wm-small {
   font-family: var(--font-wm), system-ui, sans-serif;
   color: var(--yellow);
-  -webkit-text-stroke: 0.09em #000;
+  -webkit-text-stroke: 0.09em var(--wm-edge);
   paint-order: stroke fill;
-  text-shadow: 0.05em 0.07em 0 #000;
+  text-shadow: 0.05em 0.07em 0 var(--wm-edge);
   letter-spacing: 0.02em;
   transform: rotate(-2deg);
   display: inline-block;
@@ -392,11 +443,6 @@ body {
     radial-gradient(ellipse 60% 45% at 50% 0%, var(--glow-b), transparent 70%),
     var(--stage);
   transition: background-color 0.6s ease;
-}
-:root[data-theme="day"] .flood {
-  background:
-    radial-gradient(circle at 84% 12%, rgba(255, 244, 196, 0.95) 0 70px, rgba(255, 210, 63, 0.45) 71px 120px, transparent 260px),
-    linear-gradient(180deg, #ffd59a 0%, #ffe6c2 55%, var(--stage) 100%);
 }
 
 /* ---------- marquee ---------- */

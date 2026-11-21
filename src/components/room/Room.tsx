@@ -398,7 +398,7 @@ export function Room({ id }: { id: string }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 pt-4">
           <Brand />
           <div className="flex items-center gap-2">
-            <ThemeToggle className="hidden sm:inline-flex" />
+            <div className="hidden sm:block"><ThemeToggle /></div>
             <button className="key key-sm" onClick={invite}>
               Invite
             </button>
@@ -409,7 +409,7 @@ export function Room({ id }: { id: string }) {
         <div className="mx-auto max-w-7xl px-4 pb-6 pt-5">
           <div className="led scanlines grid gap-4 rounded-[20px] p-4 text-paper sm:grid-cols-[auto_1fr_auto] sm:items-center sm:p-5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_#000]">
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_var(--shadow)]">
                 <Art src={SPORT_ART[sport].bolo} className="h-14 w-14" />
               </span>
               <div className="min-w-0">
@@ -484,7 +484,7 @@ export function Room({ id }: { id: string }) {
               <div className="turf relative flex h-28 items-end justify-between border-b-[3px] border-ink px-4 pb-2 sm:h-32 sm:px-5">
                 <div className="flex flex-col items-start gap-1.5 pb-1">
                   <span
-                    className={`font-led rounded-md border-2 border-ink px-2 text-xl shadow-[0_3px_0_#000] ${
+                    className={`font-led rounded-md border-2 border-ink px-2 text-xl shadow-[0_3px_0_var(--shadow)] ${
                       open ? "bg-lime" : phase === "pending" ? "bg-yellow" : phase === "settled" ? "bg-paper" : phase === "waiting" ? "bg-sand" : "bg-red text-white"
                     }`}
                   >
@@ -544,10 +544,10 @@ export function Room({ id }: { id: string }) {
                             isResult ? "bg-lime" : picked ? "bg-orange" : KEY_FACES[i % KEY_FACES.length]
                           } ${
                             picked || isResult
-                              ? "translate-y-[4px] shadow-[0_2px_0_#000]"
+                              ? "translate-y-[4px] shadow-[0_2px_0_var(--shadow)]"
                               : closed
-                                ? "opacity-55 shadow-[0_6px_0_#000]"
-                                : "shadow-[0_6px_0_#000] hover:-translate-y-0.5 hover:shadow-[0_8px_0_#000] active:translate-y-[5px] active:shadow-[0_1px_0_#000]"
+                                ? "opacity-55 shadow-[0_6px_0_var(--shadow)]"
+                                : "shadow-[0_6px_0_var(--shadow)] hover:-translate-y-0.5 hover:shadow-[0_8px_0_var(--shadow)] active:translate-y-[5px] active:shadow-[0_1px_0_var(--shadow)]"
                           }`}
                         >
                           <div className="flex items-center gap-3 px-3.5 pb-3 pt-3">
@@ -624,13 +624,13 @@ export function Room({ id }: { id: string }) {
                   return (
                     <div key={r.mid} className="group relative shrink-0">
                       <div
-                        className={`rise grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink text-sm font-black shadow-[0_3px_0_#000] transition-transform group-hover:-translate-y-1 ${
+                        className={`rise grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink text-sm font-black shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-1 ${
                           pick ? (right ? "bg-lime text-ink" : "bg-k-rose text-ink") : "bg-sand text-ink"
                         }`}
                       >
                         {short(r.label)}
                       </div>
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border-2 border-ink bg-paper p-2 text-xs text-ink shadow-[0_3px_0_#000] group-hover:block">
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border-2 border-ink bg-paper p-2 text-xs text-ink shadow-[0_3px_0_var(--shadow)] group-hover:block">
                         <b>{r.label}</b> · {r.detail ?? ""}
                         <br />
                         {r.winners.length}/{r.total} called it{pick ? (right ? " · you too ✓" : " · not you") : ""}
@@ -674,7 +674,7 @@ export function Room({ id }: { id: string }) {
       </div>
 
       {/* mobile tab bar */}
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-1 rounded-2xl border-[2.5px] border-ink bg-stage-2 p-1.5 shadow-[0_5px_0_#000] lg:hidden">
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-1 rounded-2xl border-[2.5px] border-ink bg-stage-2 p-1.5 shadow-[0_5px_0_var(--shadow)] lg:hidden">
         {(
           [
             ["play", "Play", "b2/foam-finger"],
@@ -685,7 +685,7 @@ export function Room({ id }: { id: string }) {
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-extrabold transition-all ${tab === k ? "bg-orange text-ink shadow-[0_3px_0_#000]" : "text-on-muted"}`}
+            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-extrabold transition-all ${tab === k ? "bg-orange text-ink shadow-[0_3px_0_var(--shadow)]" : "text-on-muted"}`}
           >
             <Art src={art} className="h-6 w-6" /> {label}
           </button>
@@ -869,7 +869,7 @@ function ChatBox({
             <div key={l.id} className={`rise flex items-end gap-2 ${l.from === meId ? "flex-row-reverse" : ""}`}>
               <Avatar id={names[l.from]?.avatar} size={28} className="border border-ink" />
               <div
-                className={`max-w-[78%] rounded-2xl border-2 border-ink px-3 py-1.5 text-ink shadow-[0_2px_0_#000] ${l.from === meId ? "rounded-br-sm bg-orange" : "rounded-bl-sm bg-paper"}`}
+                className={`max-w-[78%] rounded-2xl border-2 border-ink px-3 py-1.5 text-ink shadow-[0_2px_0_var(--shadow)] ${l.from === meId ? "rounded-br-sm bg-orange" : "rounded-bl-sm bg-paper"}`}
               >
                 {l.from !== meId && (
                   <p className="text-[11px] font-extrabold text-orange-d">
@@ -889,7 +889,7 @@ function ChatBox({
           <button
             key={e}
             onClick={() => onReact(e)}
-            className="grid h-11 w-11 place-items-center rounded-xl border-2 border-ink bg-paper shadow-[0_3px_0_#000] transition-all hover:-translate-y-1 hover:rotate-12 active:translate-y-[2px] active:shadow-none"
+            className="grid h-11 w-11 place-items-center rounded-xl border-2 border-ink bg-paper shadow-[0_3px_0_var(--shadow)] transition-all hover:-translate-y-1 hover:rotate-12 active:translate-y-[2px] active:shadow-none"
             aria-label={REACTION_ART[e].label}
             title={REACTION_ART[e].label}
           >

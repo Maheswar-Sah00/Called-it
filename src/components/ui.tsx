@@ -61,10 +61,10 @@ export function Wordmark({ className = "", size = "text-7xl", stacked = true }: 
 export function Brand() {
   return (
     <Link href="/" className="group inline-flex items-center gap-2.5">
-      <span className="grid h-10 w-10 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_#000] transition-transform group-hover:-rotate-6 group-hover:scale-105">
+      <span className="grid h-10 w-10 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_var(--shadow)] transition-transform group-hover:-rotate-6 group-hover:scale-105">
         <Art src="b3/pumped" className="h-8 w-8" />
       </span>
-      <span className="wm-small whitespace-nowrap text-xl sm:text-2xl">CALLED IT!</span>
+      <span className="wm-small whitespace-nowrap text-xl max-[420px]:hidden sm:text-2xl">CALLED IT!</span>
     </Link>
   );
 }
@@ -163,7 +163,7 @@ export function Faq({ q, a, n }: { q: string; a: string; n: number }) {
         <span className="font-led w-8 shrink-0 text-2xl text-orange-d">{String(n).padStart(2, "0")}</span>
         <span className="flex-1 font-display text-lg font-bold">{q}</span>
         <span
-          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border-2 border-ink text-lg font-bold shadow-[0_3px_0_#000] transition-all ${open ? "rotate-45 bg-orange" : "bg-paper"}`}
+          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border-2 border-ink text-lg font-bold shadow-[0_3px_0_var(--shadow)] transition-all ${open ? "rotate-45 bg-orange" : "bg-paper"}`}
         >
           +
         </span>
