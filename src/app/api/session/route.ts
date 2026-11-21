@@ -2,6 +2,7 @@ import { appKey, issueToken } from "@/lib/server/nexconn";
 import { cleanName, newUserId, readSession, writeSession } from "@/lib/server/session";
 import { fail, limited, ok } from "@/lib/server/http";
 import { sadd } from "@/lib/server/store";
+import { AVATARS } from "@/lib/game";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +18,14 @@ export async function GET() {
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "local";
   if (limited(`session:${ip}`, 20, 60_000)) return fail(429, "Too many joins, try again in a minute");
-  const body = (await req.json().catch(() => ({}))) as { name?: string; demo?: boolean };
+  const body = (await req.json().catch(() => ({}))) as { name?: string; demo?: boolean; avatar?: string };
+  const avatar = (AVATARS as readonly string[]).includes(body.avatar ?? "") ? body.avatar : "student";
   const name = cleanName(body.name);
   if (!name) return fail(400, "Pick a nickname");
   const existing = await readSession();
   const userId = existing?.userId ?? newUserId();
-  await writeSession({ userId, name });
+  await writeSession({ userId, name, avatar });
   const t = await issueToken(userId, name);
   if (!body.demo) await sadd("impact:users", userId);
-  return ok({ session: { userId, name }, token: t.token, appKey: appKey(), tokenMs: t.ms });
+  return ok({ session: { userId, name, avatar }, token: t.token, appKey: appKey(), tokenMs: t.ms });
 }

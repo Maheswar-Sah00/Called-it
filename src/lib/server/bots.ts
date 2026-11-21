@@ -14,6 +14,14 @@ export const BOT_NAMES: Record<string, string> = {
   bot_dev: "Dev 🤖",
 };
 
+export const BOT_AVATARS: Record<string, string> = {
+  bot_aman: "chai-uncle",
+  bot_priya: "facepaint",
+  bot_kabir: "gamer",
+  bot_meera: "grandma",
+  bot_dev: "popcorn",
+};
+
 const WEIGHTS: Record<string, number> = { "0": 30, "1-3": 32, "4": 14, "6": 8, W: 11, EX: 5 };
 
 function hash(s: string) {

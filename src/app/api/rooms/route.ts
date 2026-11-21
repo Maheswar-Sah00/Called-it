@@ -1,11 +1,10 @@
 import { createRoom } from "@/lib/server/rooms";
 import { readSession } from "@/lib/server/session";
 import { fail, limited, ok } from "@/lib/server/http";
-import type { Sport } from "@/lib/game";
+import { SPORTS, type Sport } from "@/lib/game";
 
 export const dynamic = "force-dynamic";
 
-const SPORTS: Sport[] = ["cricket", "football", "tennis", "kabaddi", "other"];
 
 /** Create a match room (a Nexconn open channel). The creator is the host. */
 export async function POST(req: Request) {
@@ -28,6 +27,7 @@ export async function POST(req: Request) {
       mode,
       hostId: s.userId,
       hostName: s.name,
+      hostAvatar: s.avatar,
       demo: !!body.demo,
     });
     return ok({ room, channelMs });

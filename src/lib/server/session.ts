@@ -13,7 +13,7 @@ function mac(v: string) {
   return createHmac("sha256", secret()).update(v).digest("base64url");
 }
 
-export type Session = { userId: string; name: string };
+export type Session = { userId: string; name: string; avatar?: string };
 
 export function newUserId() {
   return "u" + randomBytes(9).toString("base64url").replace(/[^a-zA-Z0-9]/g, "x");

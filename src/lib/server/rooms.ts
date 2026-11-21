@@ -30,7 +30,7 @@ import {
   zincr,
   ztop,
 } from "./store";
-import { BOT_NAMES, botCall, botLine } from "./bots";
+import { BOT_AVATARS, BOT_NAMES, botCall, botLine } from "./bots";
 
 type ReplayBall = {
   over: number;
@@ -48,6 +48,7 @@ const K = {
   moment: (id: string) => `room:${id}:m`,
   calls: (id: string, mid: string) => `room:${id}:c:${mid}`,
   names: (id: string) => `room:${id}:names`,
+  avatars: (id: string) => `room:${id}:av`,
   board: (id: string) => `room:${id}:board`,
   streak: (id: string) => `room:${id}:streak`,
   result: (id: string) => `room:${id}:last`,
@@ -57,7 +58,7 @@ const K = {
 };
 
 // Replay timing (ms). Long enough to call, short enough for a 60-second judge demo.
-const OPEN_MS = 6500;
+const OPEN_MS = 8000;
 const REVIEW_MS = 2200;
 const GAP_MS = 3200;
 
@@ -71,6 +72,7 @@ export async function createRoom(opts: {
   mode: "host" | "replay";
   hostId: string;
   hostName: string;
+  hostAvatar?: string;
   demo: boolean;
 }) {
   const id = newRoomId();
@@ -88,7 +90,7 @@ export async function createRoom(opts: {
   const r = await createOpenChannel(channelId, { phase: "waiting", room: opts.name });
   if (r.code !== 0) throw new Error(`open channel create failed: ${r.code} ${r.errorMessage ?? ""}`);
   await setJSON(K.room(id), room);
-  await hset(K.names(id), opts.hostId, opts.hostName);
+  await rememberName(id, opts.hostId, opts.hostName, opts.hostAvatar);
   if (opts.mode === "replay") {
     await setJSON(K.replay(id), { index: 0, phase: "idle", nextAt: Date.now() + 2500 });
   }
@@ -105,13 +107,21 @@ export async function getRoom(id: string) {
   return getJSON<RoomPublic>(K.room(id));
 }
 
-export async function rememberName(roomId: string, userId: string, name: string) {
+export async function rememberName(roomId: string, userId: string, name: string, avatar?: string) {
   await hset(K.names(roomId), userId, name);
+  if (avatar) await hset(K.avatars(roomId), userId, avatar);
+}
+
+export async function roomNames(roomId: string) {
+  const [names, avs] = await Promise.all([hgetall(K.names(roomId)), hgetall(K.avatars(roomId))]);
+  const out: Record<string, { name: string; avatar: string }> = {};
+  for (const [id, name] of Object.entries(names)) out[id] = { name, avatar: avs[id] ?? BOT_AVATARS[id] ?? "student" };
+  return out;
 }
 
 async function board(roomId: string) {
   const [top, names] = await Promise.all([ztop(K.board(roomId), 10), hgetall(K.names(roomId))]);
-  return top.map((t) => ({ name: names[t.member] ?? "Someone", points: t.score }));
+  return top.map((t) => ({ id: t.member, name: names[t.member] ?? "Someone", points: t.score }));
 }
 
 async function tallyOf(roomId: string, mid: string, options: Option[]): Promise<TallyCard> {
@@ -135,10 +145,13 @@ export async function roomState(roomId: string, userId: string | null): Promise<
     if (userId) myCall = (await hgetall(K.calls(roomId, m.mid)))[userId] ?? null;
   }
   const lastResult = await getJSON<ResultCard>(K.result(roomId));
+  const rp = room.mode === "replay" ? await getJSON<{ index: number; nextAt: number; phase: string }>(K.replay(roomId)) : null;
   const replay =
     room.mode === "replay"
       ? {
-          index: ((await getJSON<{ index: number }>(K.replay(roomId)))?.index ?? 0),
+          index: rp?.index ?? 0,
+          nextAt: rp?.nextAt ?? 0,
+          phase: rp?.phase ?? "idle",
           total: REPLAY.balls.length,
           title: REPLAY.title,
           setup: REPLAY.setup,
@@ -151,6 +164,8 @@ export async function roomState(roomId: string, userId: string | null): Promise<
     tally,
     board: await board(roomId),
     myCall,
+    names: await roomNames(roomId),
+    amHost: !!userId && userId === room.hostId,
     scoreline: m.scoreline || lastResult?.scoreline || null,
     replay,
   };

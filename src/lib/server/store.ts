@@ -9,7 +9,14 @@ import { Redis } from "@upstash/redis";
  */
 
 const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-const redis = hasRedis ? Redis.fromEnv() : null;
+// Raw strings in, raw strings out: auto-deserialisation would turn hex ids like "12e45" into numbers.
+const redis = hasRedis
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      automaticDeserialization: false,
+    })
+  : null;
 
 type Mem = { kv: Map<string, unknown>; exp: Map<string, number> };
 const g = globalThis as unknown as { __ciMem?: Mem };
@@ -28,12 +35,20 @@ function memGet<T>(k: string): T | undefined {
 export const storeKind = hasRedis ? "upstash-redis" : "memory (dev only)";
 
 export async function getJSON<T>(key: string): Promise<T | null> {
-  if (redis) return ((await redis.get<T>(key)) ?? null) as T | null;
+  if (redis) {
+    const raw = await redis.get<string>(key);
+    if (raw === null || raw === undefined) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return raw as unknown as T;
+    }
+  }
   return (memGet<T>(key) ?? null) as T | null;
 }
 
 export async function setJSON(key: string, value: unknown, ttlSec = 60 * 60 * 24 * 14) {
-  if (redis) return void (await redis.set(key, value, { ex: ttlSec }));
+  if (redis) return void (await redis.set(key, JSON.stringify(value), { ex: ttlSec }));
   mem.kv.set(key, structuredClone(value));
   mem.exp.set(key, Date.now() + ttlSec * 1000);
 }
@@ -46,7 +61,16 @@ export async function hset(key: string, field: string, value: string) {
 }
 
 export async function hgetall(key: string): Promise<Record<string, string>> {
-  if (redis) return ((await redis.hgetall<Record<string, string>>(key)) ?? {}) as Record<string, string>;
+  if (redis) {
+    const raw = (await redis.hgetall<Record<string, unknown>>(key)) as unknown;
+    const out: Record<string, string> = {};
+    if (Array.isArray(raw)) {
+      for (let i = 0; i + 1 < raw.length; i += 2) out[String(raw[i])] = String(raw[i + 1]);
+      return out;
+    }
+    for (const [k, v] of Object.entries((raw ?? {}) as Record<string, unknown>)) out[k] = typeof v === "string" ? v : JSON.stringify(v);
+    return out;
+  }
   return { ...((memGet<Record<string, string>>(key) ?? {}) as Record<string, string>) };
 }
 
@@ -72,14 +96,14 @@ export async function ztop(key: string, n: number): Promise<{ member: string; sc
 }
 
 export async function incr(key: string, by = 1): Promise<number> {
-  if (redis) return await redis.incrby(key, by);
+  if (redis) return Number(await redis.incrby(key, by));
   const v = ((memGet<number>(key) ?? 0) as number) + by;
   mem.kv.set(key, v);
   return v;
 }
 
 export async function sadd(key: string, member: string): Promise<number> {
-  if (redis) return await redis.sadd(key, member);
+  if (redis) return Number(await redis.sadd(key, member));
   const s = new Set((memGet<string[]>(key) ?? []) as string[]);
   const before = s.size;
   s.add(member);
@@ -88,7 +112,7 @@ export async function sadd(key: string, member: string): Promise<number> {
 }
 
 export async function scard(key: string): Promise<number> {
-  if (redis) return await redis.scard(key);
+  if (redis) return Number(await redis.scard(key));
   return ((memGet<string[]>(key) ?? []) as string[]).length;
 }
 
