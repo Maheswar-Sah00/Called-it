@@ -31,27 +31,45 @@ export function Art({
   );
 }
 
-export function Wordmark({ className = "", size = "text-7xl" }: { className?: string; size?: string }) {
+/** The CALLED IT! sticker wordmark (layered: outline/extrude, red rim, amber fill with a glint). */
+export function Wordmark({ className = "", size = "text-7xl", stacked = true }: { className?: string; size?: string; stacked?: boolean }) {
+  const lines = stacked ? ["CALLED", "IT!"] : ["CALLED IT!"];
+  const body = (
+    <>
+      {lines.map((l, i) => (
+        <span key={i} className="block">
+          {l}
+        </span>
+      ))}
+    </>
+  );
   return (
-    <div className={`wordmark text-center ${size} ${className}`} aria-label="Called It">
-      <div>CALLED</div>
-      <div className="-mt-[0.04em]">IT!</div>
+    <div className={`wm ${size} ${className}`} role="img" aria-label="Called It!">
+      <span className="wm-back" aria-hidden>
+        {body}
+      </span>
+      <span className="wm-rim" aria-hidden>
+        {body}
+      </span>
+      <span className="wm-front" aria-hidden>
+        {body}
+      </span>
     </div>
   );
 }
 
-export function Brand({ dark = false }: { dark?: boolean }) {
+export function Brand() {
   return (
-    <Link href="/" className="group inline-flex items-center gap-2">
-      <Art src="b3/pumped" className="h-9 w-9 transition-transform group-hover:-rotate-12 group-hover:scale-110" />
-      <span className={`font-slab text-xl tracking-wide ${dark ? "text-ink" : "text-cream"}`} style={{ WebkitTextStroke: dark ? "0" : "1px #111" }}>
-        CALLED IT
+    <Link href="/" className="group inline-flex items-center gap-2.5">
+      <span className="grid h-10 w-10 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_#000] transition-transform group-hover:-rotate-6 group-hover:scale-105">
+        <Art src="b3/pumped" className="h-8 w-8" />
       </span>
+      <span className="wm-small whitespace-nowrap text-xl sm:text-2xl">CALLED IT!</span>
     </Link>
   );
 }
 
-export function Sparkle({ className = "", color = "#fff" }: { className?: string; color?: string }) {
+export function Star({ className = "", color = "var(--yellow)" }: { className?: string; color?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={`twinkle ${className}`} aria-hidden>
       <path d="M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z" fill={color} />
@@ -59,30 +77,40 @@ export function Sparkle({ className = "", color = "#fff" }: { className?: string
   );
 }
 
-/** Puffy cartoon cloud band (white with a soft cream underside). */
-export function Clouds({ className = "" }: { className?: string }) {
+/** A floodlight tower (pixel-ish) for the stadium skyline. */
+export function Floodlight({ className = "" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 1440 220" preserveAspectRatio="none" className={className} aria-hidden>
-      <path
-        d="M0 140 C60 60 170 70 210 120 C240 50 360 40 400 110 C450 40 560 60 580 120 C640 70 720 80 750 130 C800 60 930 60 960 125 C1010 70 1110 70 1140 120 C1190 60 1310 60 1340 115 C1380 80 1430 95 1440 110 L1440 220 L0 220Z"
-        fill="#fff"
-      />
-      <path
-        d="M0 175 C80 130 170 140 230 170 C300 130 400 140 450 170 C520 135 640 140 700 172 C780 135 880 140 940 170 C1010 135 1120 140 1180 170 C1250 140 1360 140 1440 168 L1440 220 L0 220Z"
-        fill="var(--cream)"
-      />
+    <svg viewBox="0 0 60 120" className={className} aria-hidden>
+      <rect x="27" y="34" width="6" height="86" fill="#3e2619" stroke="#000" strokeWidth="2" />
+      <rect x="6" y="4" width="48" height="30" rx="4" fill="#2c1a12" stroke="#000" strokeWidth="2.5" />
+      {[0, 1, 2].map((r) =>
+        [0, 1, 2, 3].map((c) => (
+          <rect key={`${r}${c}`} x={10 + c * 11} y={8 + r * 8.5} width="8" height="6" rx="1.5" fill="#fff3a8" className="twinkle" style={{ animationDelay: `${(r + c) * 0.3}s` }} />
+        )),
+      )}
     </svg>
   );
 }
 
-export function Ticker({ items }: { items: string[] }) {
+/** The pitch: mown stripes receding into the distance. */
+export function Pitch({ className = "" }: { className?: string }) {
+  return (
+    <div className={`pointer-events-none overflow-hidden [perspective:420px] ${className}`} aria-hidden>
+      <div className="turf absolute inset-x-[-40%] bottom-0 top-0 origin-bottom [transform:rotateX(58deg)]" />
+      <div className="absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-stage to-transparent" />
+    </div>
+  );
+}
+
+/** LED scoreboard marquee. */
+export function Marquee({ items, className = "" }: { items: string[]; className?: string }) {
   const row = [...items, ...items];
   return (
-    <div className="ticker relative z-10 -rotate-1 py-2.5">
-      <div className="ticker-track">
+    <div className={`marquee led relative z-10 py-2.5 !shadow-none ${className}`}>
+      <div className="marquee-track">
         {row.map((t, i) => (
-          <span key={i} className="mx-6 font-mono text-sm font-bold uppercase tracking-wider">
-            {t} <span className="mx-4">·</span>
+          <span key={i} className="font-led led-text mx-5 text-2xl uppercase">
+            {t} <span className="mx-4 text-orange">◆</span>
           </span>
         ))}
       </div>
@@ -95,7 +123,7 @@ export function Avatar({ id, size = 36, ring = false, className = "" }: { id?: s
     <Art
       src={`c1/${id || "student"}`}
       size={size}
-      className={`shrink-0 rounded-full ${ring ? "ring-2 ring-ink ring-offset-2 ring-offset-yellow" : ""} ${className}`}
+      className={`shrink-0 rounded-full ${ring ? "ring-[3px] ring-orange ring-offset-2 ring-offset-paper" : ""} ${className}`}
       style={{ width: size, height: size }}
     />
   );
@@ -110,18 +138,15 @@ export function Modal({ open, onClose, children, wide = false }: { open: boolean
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/55 p-3 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-[3px] sm:items-center" onClick={onClose}>
       <div
-        className={`rise brut-lg relative max-h-[92vh] w-full overflow-y-auto rounded-3xl bg-paper p-6 ${wide ? "max-w-2xl" : "max-w-md"}`}
+        className={`rise brut-lg relative max-h-[92vh] w-full overflow-y-auto rounded-[22px] bg-paper p-6 text-ink ${wide ? "max-w-2xl" : "max-w-md"}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal
       >
-        <button
-          onClick={onClose}
-          className="btn btn-white btn-sm absolute right-4 top-4 !h-9 !w-9 !p-0 text-lg"
-          aria-label="Close"
-        >
+        <div className="absolute inset-x-0 top-0 h-2 rounded-t-[19px] bg-[repeating-linear-gradient(90deg,var(--orange)_0_18px,var(--yellow)_18px_36px)]" />
+        <button onClick={onClose} className="key key-paper key-sm absolute right-4 top-5 !h-9 !w-9 !p-0 text-lg" aria-label="Close">
           ×
         </button>
         {children}
@@ -130,17 +155,22 @@ export function Modal({ open, onClose, children, wide = false }: { open: boolean
   );
 }
 
-export function Faq({ q, a }: { q: string; a: string }) {
+export function Faq({ q, a, n }: { q: string; a: string; n: number }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`brut-sm rounded-2xl bg-white transition-colors ${open ? "bg-t-butter" : "hover:bg-t-butter/50"}`}>
-      <button className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-bold" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span>{q}</span>
-        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-ink text-lg transition-transform ${open ? "rotate-45 bg-yellow" : ""}`}>+</span>
+    <div className={`border-b-2 border-dashed border-ink/25 transition-colors ${open ? "bg-k-butter/60" : "hover:bg-k-butter/30"}`}>
+      <button className="flex w-full items-center gap-4 px-3 py-4 text-left" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="font-led w-8 shrink-0 text-2xl text-orange-d">{String(n).padStart(2, "0")}</span>
+        <span className="flex-1 font-display text-lg font-bold">{q}</span>
+        <span
+          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border-2 border-ink text-lg font-bold shadow-[0_3px_0_#000] transition-all ${open ? "rotate-45 bg-orange" : "bg-paper"}`}
+        >
+          +
+        </span>
       </button>
       <div className={`grid transition-all duration-300 ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
         <div className="overflow-hidden">
-          <p className="px-5 pb-5 text-[15px] leading-relaxed text-muted">{a}</p>
+          <p className="pb-5 pl-15 pr-12 text-[15px] leading-relaxed text-muted">{a}</p>
         </div>
       </div>
     </div>
@@ -149,16 +179,16 @@ export function Faq({ q, a }: { q: string; a: string }) {
 
 export function Toast({ text, tone = "ink" }: { text: string | null; tone?: "ink" | "red" | "mint" }) {
   if (!text) return null;
-  const bg = tone === "red" ? "bg-red text-white" : tone === "mint" ? "bg-mint" : "bg-ink text-white";
+  const bg = tone === "red" ? "bg-red text-white" : tone === "mint" ? "bg-lime text-ink" : "bg-paper text-ink";
   return (
-    <div className="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2">
-      <div className={`rise brut-sm rounded-full px-5 py-2.5 text-sm font-bold ${bg}`}>{text}</div>
+    <div className="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 lg:bottom-8">
+      <div className={`rise brut-sm rounded-xl px-5 py-2.5 text-sm font-bold ${bg}`}>{text}</div>
     </div>
   );
 }
 
 export function useToast() {
-  const [t, setT] = useState<{ text: string; tone: "ink" | "red" | "mint" } | null>(null);
+  const [t, setT] = useState<{ text: string; tone: "ink" | "red" | "mint"; n: number } | null>(null);
   useEffect(() => {
     if (!t) return;
     const id = setTimeout(() => setT(null), 2600);
@@ -166,6 +196,6 @@ export function useToast() {
   }, [t]);
   return {
     node: <Toast text={t?.text ?? null} tone={t?.tone} />,
-    show: (text: string, tone: "ink" | "red" | "mint" = "ink") => setT({ text, tone }),
+    show: (text: string, tone: "ink" | "red" | "mint" = "ink") => setT({ text, tone, n: Date.now() }),
   };
 }

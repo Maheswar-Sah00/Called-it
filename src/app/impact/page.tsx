@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client/session";
 import { Art, Brand } from "@/components/ui";
+import { ThemeToggle } from "@/components/Theme";
 
 type Impact = { users: number; rooms: number; calls: number; callers: number; blocked: number; at: number };
 
@@ -18,35 +19,37 @@ export default function ImpactPage() {
 
   const tiles = [
     { k: "People who joined", v: d?.users, art: "c1/student", bg: "bg-yellow" },
-    { k: "Real match rooms", v: d?.rooms, art: "b2/megaphone", bg: "bg-mint" },
+    { k: "Real match rooms", v: d?.rooms, art: "b2/megaphone", bg: "bg-lime" },
     { k: "Calls made", v: d?.calls, art: "b2/foam-finger", bg: "bg-pink" },
-    { k: "People who called", v: d?.callers, art: "b2/check", bg: "bg-lav" },
-    { k: "Spam & forged cards stopped", v: d?.blocked, art: "b2/lock", bg: "bg-[#7cc4ff]" },
+    { k: "People who called", v: d?.callers, art: "b2/check", bg: "bg-k-leaf" },
+    { k: "Spam & forged cards stopped", v: d?.blocked, art: "b2/lock", bg: "bg-k-rose" },
   ];
 
   return (
-    <main className="min-h-screen bg-cream pb-20">
-      <div className="bg-blue pb-16">
-        <div className="mx-auto max-w-6xl px-4 pt-5">
+    <main className="min-h-screen pb-20">
+      <div className="flood pb-20">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-5">
           <Brand />
+          <ThemeToggle />
         </div>
-        <div className="mx-auto max-w-6xl px-4 pt-12 text-white">
-          <h1 className="font-display text-5xl font-extrabold text-cream">Live impact</h1>
-          <p className="mt-2 max-w-xl text-white/85">
-            Real people, real rooms. Demo rooms and 🤖 bots are never counted. Refreshes every 10 seconds.
+        <div className="mx-auto max-w-6xl px-4 pt-12">
+          <p className="font-led text-2xl text-orange">THE SCOREBOARD THAT MATTERS</p>
+          <h1 className="font-arcade text-5xl">Live impact</h1>
+          <p className="mt-2 max-w-xl text-on-muted">
+            Real people, real rooms. Demo rooms and bots are never counted. Refreshes every 10 seconds.
           </p>
         </div>
       </div>
       <div className="mx-auto -mt-10 grid max-w-6xl gap-5 px-4 sm:grid-cols-2 lg:grid-cols-5">
         {tiles.map((t, i) => (
-          <div key={t.k} className={`brut lift rise rounded-3xl ${t.bg} p-5`} style={{ animationDelay: `${i * 60}ms` }}>
+          <div key={t.k} className={`brut lift rise rounded-3xl ${t.bg} p-5 text-ink`} style={{ animationDelay: `${i * 60}ms` }}>
             <Art src={t.art} className="h-14 w-14 rounded-full" />
-            <p className="font-display mt-3 text-5xl font-extrabold">{t.v ?? "…"}</p>
+            <p className="font-led mt-3 text-7xl leading-none">{t.v ?? "…"}</p>
             <p className="mt-1 text-sm font-bold">{t.k}</p>
           </div>
         ))}
       </div>
-      <p className="mx-auto mt-8 max-w-6xl px-4 text-xs text-muted">
+      <p className="mx-auto mt-8 max-w-6xl px-4 text-xs text-on-muted">
         {d ? `Updated ${new Date(d.at).toLocaleTimeString()}` : "Loading…"} · Counted on the server from Nexconn tokens issued and calls accepted.
       </p>
     </main>

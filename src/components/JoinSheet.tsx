@@ -59,8 +59,8 @@ export function JoinSheet({
           </button>
         ))}
       </div>
-      {error && <p className="mt-4 rounded-xl border-2 border-ink bg-t-pink px-3 py-2 text-sm font-semibold">{error}</p>}
-      <button className="btn mt-6 w-full text-lg" disabled={!valid || busy}>
+      {error && <p className="mt-4 rounded-xl border-2 border-ink bg-k-rose px-3 py-2 text-sm font-semibold">{error}</p>}
+      <button className="key mt-6 w-full text-lg" disabled={!valid || busy}>
         {busy ? "Joining…" : cta}
       </button>
     </form>

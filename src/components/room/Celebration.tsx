@@ -43,7 +43,7 @@ export function Celebration({ c }: { c: Celebrate }) {
       <div className="pop-in flex flex-col items-center">
         {outcomeSticker && sticker !== outcomeSticker && <Art src={outcomeSticker} className="-mb-6 w-40 rotate-6 sm:w-52" />}
         <Art src={sticker} className="w-[19rem] drop-shadow-[8px_8px_0_rgba(0,0,0,.25)] sm:w-[26rem]" />
-        <div className="brut -mt-4 flex items-center gap-3 rounded-full bg-white px-5 py-2.5">
+        <div className="brut -mt-4 flex items-center gap-3 rounded-full bg-paper px-5 py-2.5 text-ink">
           <Art src={c.right ? "b3/celebrate" : c.pick ? "b3/facepalm" : "b3/wave"} className="h-12 w-12" />
           <p className="font-display text-lg font-extrabold">
             {c.right ? `Called it! ${c.result.label}` : c.pick ? `So close. It was ${c.result.label}` : `${c.result.label}`}

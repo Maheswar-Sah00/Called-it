@@ -6,6 +6,8 @@ import {
   CARD_TYPES,
   MT,
   REACTIONS,
+  REACTION_ART,
+  type Reaction,
   SPORT_ART,
   SPORT_LABEL,
   blockReason,
@@ -16,18 +18,19 @@ import {
 import { api, useSession } from "@/lib/client/session";
 import { joinLive, log, type Live, type LiveEvent } from "@/lib/client/live";
 import { JoinSheet } from "@/components/JoinSheet";
-import { Art, Avatar, Brand, Modal, Sparkle, useToast } from "@/components/ui";
+import { Art, Avatar, Brand, Modal, useToast } from "@/components/ui";
+import { ThemeToggle } from "@/components/Theme";
 import { HostPanel } from "./HostPanel";
 import { NexconnPanel } from "./NexconnPanel";
 import { Celebration, type Celebrate } from "./Celebration";
+import { Huddle } from "./Huddle";
 
 const BOT_ID = "calledit_bot";
 type State = RoomState & { serverNow: number };
 type ChatLine = { id: string; from: string; text: string; at: number; showAt: number; sys?: boolean };
 type Floating = { id: number; e: string; x: number };
 
-const OPTION_COLORS = ["bg-t-pink", "bg-t-mint", "bg-t-peach", "bg-t-sky", "bg-t-lav", "bg-t-lime"];
-const BADGE_COLORS = ["bg-pink", "bg-mint", "bg-[#ffb27a]", "bg-[#7cc4ff]", "bg-lav", "bg-lime"];
+const KEY_FACES = ["bg-k-peach", "bg-k-leaf", "bg-k-butter", "bg-k-rose", "bg-k-sand", "bg-k-lime"];
 
 function useNow(ms = 200) {
   const [n, setN] = useState(() => Date.now());
@@ -43,7 +46,7 @@ export function Room({ id }: { id: string }) {
   const me = info?.session ?? null;
   const [st, setSt] = useState<State | null>(null);
   const [missing, setMissing] = useState(false);
-  const [tab, setTab] = useState<"room" | "board">("room");
+  const [tab, setTab] = useState<"play" | "board" | "chat">("play");
   const [joining, setJoining] = useState(false);
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<"connecting" | "live" | "offline">("connecting");
@@ -336,12 +339,12 @@ export function Room({ id }: { id: string }) {
   // ---------- render ----------
   if (missing) {
     return (
-      <main className="grid min-h-screen place-items-center bg-blue p-6 text-center text-white">
+      <main className="flood grid min-h-screen place-items-center p-6 text-center">
         <div>
           <Art src="b3/sleep" className="mx-auto w-40" />
-          <h1 className="font-display mt-4 text-3xl font-extrabold">This room has closed</h1>
-          <p className="mt-2 text-white/80">Rooms close after a day of quiet. Start a fresh one.</p>
-          <Link href="/" className="btn mt-6">
+          <h1 className="font-arcade mt-4 text-3xl">This room has closed</h1>
+          <p className="mt-2 text-on-muted">Rooms close after a day of quiet. Start a fresh one.</p>
+          <Link href="/" className="key mt-6">
             Back home
           </Link>
         </div>
@@ -351,10 +354,11 @@ export function Room({ id }: { id: string }) {
 
   const room = st?.room;
   const sport = room?.sport ?? "cricket";
+  const open = phase === "open" && !clientLocked;
   const bolo =
     phase === "waiting"
       ? "b3/sleep"
-      : phase === "open" && !clientLocked
+      : open
         ? myPick
           ? "b3/wave"
           : "b3/pumped"
@@ -369,157 +373,150 @@ export function Room({ id }: { id: string }) {
                 : "b3/facepalm"
               : "b3/wave"
             : "b3/locked";
+  const phaseLabel = phase === "waiting" ? "WARM-UP" : open ? "CALLS OPEN" : phase === "pending" ? "UNDER REVIEW" : phase === "settled" ? "SETTLED" : "LOCKED";
+  const headline = open
+    ? "Calls are open. Make yours."
+    : phase === "pending"
+      ? "Under review. Hold your nerve."
+      : phase === "settled"
+        ? shownResult && myCalls[shownResult.mid] === shownResult.outcome
+          ? "You called it."
+          : "Settled. Next one's yours."
+        : phase === "locked" || clientLocked
+          ? "Locked. Here it comes…"
+          : st?.amHost
+            ? "You're the host. Open the first call."
+            : "Waiting for the host to open a call.";
+  const visibleResults = results.filter((r) => r.at + delay * 1000 <= serverNow);
+  const rightCount = visibleResults.filter((r) => myCalls[r.mid] && myCalls[r.mid] === r.outcome).length;
+  const calledCount = visibleResults.filter((r) => myCalls[r.mid]).length;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#e4dcff_0%,#f3ecff_14%,var(--cream)_40%)] pb-24">
-      {/* top bar */}
-      <header className="relative mx-auto flex max-w-6xl items-center justify-between px-4 pt-5">
-        <Brand dark />
-        <div className="flex items-center gap-2">
-          <span className="brut-sm hidden items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold sm:inline-flex">
-            {liveStatus === "live" ? <span className="live-dot" /> : <span className="h-2.5 w-2.5 rounded-full bg-[#bbb]" />}
-            {liveStatus === "live" ? `LIVE · ${people ?? "…"} in room` : liveStatus === "connecting" ? "Connecting…" : "Offline · refreshing"}
-          </span>
-          <button className="btn btn-sm" onClick={invite}>
-            Invite friends
-          </button>
-        </div>
-        <Sparkle className="absolute -bottom-6 right-[30%] h-4 w-4" color="#111" />
-      </header>
-
-      {/* tabs */}
-      <div className="mt-6 flex justify-center">
-        <div className="brut-sm inline-flex rounded-full bg-white p-1">
-          {(["room", "board"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-full px-6 py-2 text-sm font-bold transition-all ${tab === t ? "bg-ink text-white" : "hover:bg-t-butter"}`}
-            >
-              {t === "room" ? "Match room" : "Leaderboard"}
+    <main className="min-h-screen pb-28 lg:pb-16">
+      {/* ===== top bar ===== */}
+      <header className="flood">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 pt-4">
+          <Brand />
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="hidden sm:inline-flex" />
+            <button className="key key-sm" onClick={invite}>
+              Invite
             </button>
-          ))}
+          </div>
         </div>
-      </div>
 
-      <div className="mx-auto mt-6 max-w-6xl px-4">
-        <h1 className="font-display text-center text-3xl font-extrabold sm:text-4xl">
-          {phase === "open" && !clientLocked
-            ? "Calls are open. Make yours."
-            : phase === "pending"
-              ? "Under review. Hold your nerve."
-              : phase === "settled"
-                ? shownResult && myCalls[shownResult.mid] === shownResult.outcome
-                  ? "You called it."
-                  : "Settled. Next one's yours."
-                : phase === "locked" || clientLocked
-                  ? "Locked. Here it comes…"
-                  : st?.amHost
-                    ? "You're the host. Open the first call."
-                    : "Waiting for the host to open a call."}
-        </h1>
-        <p className="mt-1 text-center text-sm text-muted">
-          {room ? `${SPORT_LABEL[sport]} · ${room.name}` : "Loading the room…"}
-          {room?.demo && " · demo bots are labelled 🤖"}
-        </p>
-
-        {/* status card */}
-        <section className="brut-lg mt-6 grid grid-cols-1 gap-5 rounded-3xl bg-white p-5 sm:p-6 md:grid-cols-[1.25fr_1fr_1fr] [&>*]:min-w-0 md:divide-x-2 md:divide-dashed md:divide-ink/20">
-          <div className="flex items-center gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted">Your room</p>
-              <p className="font-display truncate text-2xl font-extrabold sm:text-3xl">{room?.name ?? "…"}</p>
-              <p className="mt-1 text-sm font-bold">{st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "Score shows here once the host adds it")}</p>
+        {/* ===== LED scoreboard ===== */}
+        <div className="mx-auto max-w-7xl px-4 pb-6 pt-5">
+          <div className="led scanlines grid gap-4 rounded-[20px] p-4 text-paper sm:grid-cols-[auto_1fr_auto] sm:items-center sm:p-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border-2 border-ink bg-orange shadow-[0_4px_0_#000]">
+                <Art src={SPORT_ART[sport].bolo} className="h-14 w-14" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-led text-lg text-paper/60">
+                  {SPORT_LABEL[sport].toUpperCase()} · {room?.mode === "replay" ? "REPLAY" : "HOST MODE"}
+                  {room?.demo && " · WITH DEMO BOTS"}
+                </p>
+                <p className="font-arcade truncate text-xl sm:text-2xl">{room?.name ?? "Loading…"}</p>
+              </div>
+            </div>
+            <div className="min-w-0 text-left sm:text-center">
+              <p className="font-led led-text text-[1.7rem] leading-none sm:truncate sm:text-4xl">
+                {st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "SCORE LINE APPEARS HERE")}
+              </p>
               {st?.replay && (
-                <p className="mt-1 text-xs text-muted">
-                  Ball {Math.min(st.replay.index + 1, st.replay.total)} of {st.replay.total} · real Cricsheet data
+                <p className="font-led mt-1 text-lg text-paper/55">
+                  BALL {Math.min(st.replay.index + 1, st.replay.total)}/{st.replay.total} · REAL CRICSHEET DATA
                 </p>
               )}
             </div>
-            <div className="brut-sm grid h-20 w-20 shrink-0 rotate-3 sm:h-24 sm:w-24 place-items-center rounded-2xl bg-[#7cc4ff] transition-transform hover:rotate-0 hover:scale-105">
-              <Art src={SPORT_ART[sport].bolo} className="h-16 w-16 sm:h-20 sm:w-20" />
+            <div className="flex items-center gap-4 sm:justify-end">
+              <div className="flex items-center gap-2 rounded-lg border-2 border-white/15 px-2.5 py-1">
+                {liveStatus === "live" ? <span className="live-dot" /> : <span className="h-2.5 w-2.5 rounded-full bg-white/30" />}
+                <span className="font-led text-xl">{liveStatus === "live" ? `LIVE · ${people ?? "…"}` : liveStatus === "connecting" ? "TUNING IN" : "RECONNECTING"}</span>
+              </div>
+              <div className="text-right">
+                <p className="font-led text-lg leading-none text-paper/55">YOU</p>
+                <p className="font-led led-text text-4xl leading-none">{myPoints}</p>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col justify-center gap-2.5 md:pl-5">
-            <Check done={!!me} label="You're in" sub={me ? `as ${me.name}` : "pick a nickname"} />
-            <Check done={liveStatus === "live"} label="Live on Nexconn" sub={liveStatus === "live" ? `${people ?? "…"} watching` : "connecting…"} />
-            <Check done={!!myPick || results.some((r) => myCalls[r.mid])} label="First call made" sub="tap an answer when calls open" />
-          </div>
-          <div className="md:pl-5">
-            <p className="text-xs text-muted">Your points</p>
-            <div className="flex items-end gap-3">
-              <p className="font-display text-5xl font-extrabold">{myPoints}</p>
-              {streak >= 2 && (
-                <span className="pop-in mb-2 inline-flex items-center gap-1 rounded-full border-2 border-ink bg-[#ffb27a] px-2 py-0.5 text-xs font-extrabold">
-                  <Art src="b2/flame" className="h-4 w-4" /> {streak} streak
-                </span>
-              )}
-            </div>
-            <div className="mt-2 h-3 overflow-hidden rounded-full border-2 border-ink bg-t-lav">
-              <div
-                className="h-full rounded-full bg-lav transition-all duration-700"
-                style={{ width: `${board[0]?.points ? Math.max(4, (myPoints / board[0].points) * 100) : 4}%` }}
-              />
-            </div>
-            <p className="mt-2 text-sm font-bold">{myRank >= 0 ? `#${myRank + 1} in this room` : "Not on the board yet"}</p>
-            <p className="text-xs text-muted">Right calls score. Two in a row adds +5 each.</p>
-          </div>
-        </section>
+        </div>
+      </header>
 
-        {tab === "board" ? (
-          <BoardPage board={board} names={st?.names ?? {}} meId={me?.userId} results={results} myCalls={myCalls} />
-        ) : (
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.45fr_1fr] [&>*]:min-w-0">
-            <div className="flex flex-col gap-6">
-              {/* MOMENT */}
-              <section
-                className={`brut-lg relative overflow-hidden rounded-3xl p-5 transition-colors duration-500 sm:p-6 ${
-                  phase === "open" && !clientLocked
-                    ? "bg-t-mint"
-                    : phase === "pending"
-                      ? "bg-t-butter"
-                      : phase === "settled"
-                        ? "bg-t-lav"
-                        : phase === "waiting"
-                          ? "bg-white"
-                          : "bg-t-pink"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="badge-pts bg-white !h-8 !min-w-0 px-3 text-xs">
-                        {phase === "waiting" ? "WAITING" : phase === "open" && !clientLocked ? "CALLS OPEN" : phase === "pending" ? "UNDER REVIEW" : phase === "settled" ? "SETTLED" : "LOCKED"}
-                      </span>
-                      {moment?.ball && (
-                        <span className="rounded-full border-2 border-ink bg-white px-3 py-1 font-mono text-xs font-bold">
-                          Over {moment.ball.over} · {moment.ball.bowler} to {moment.ball.batter}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="font-display mt-3 text-3xl font-extrabold leading-tight sm:text-4xl">
-                      {moment?.q ?? (st?.amHost ? "Ask the room something" : "The host is picking the moment")}
-                    </h2>
-                    {moment?.ball?.need && <p className="mt-1 text-sm font-bold">{moment.ball.need}</p>}
-                  </div>
-                  <Art key={bolo} src={bolo} className="pop-in h-24 w-24 shrink-0 sm:h-32 sm:w-32" />
+      <div className="mx-auto mt-6 max-w-7xl px-4">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[17rem_minmax(0,1fr)_21rem] [&>*]:min-w-0">
+          {/* ===== LEFT: you + table ===== */}
+          <aside className={`flex flex-col gap-6 ${tab === "board" ? "" : "max-lg:hidden"}`}>
+            <section className="brut rounded-[20px] bg-paper p-4 text-ink">
+              <div className="flex items-center gap-3">
+                <Avatar id={me?.avatar ?? st?.names[me?.userId ?? ""]?.avatar} size={48} className="border-2 border-ink" />
+                <div className="min-w-0">
+                  <p className="font-arcade truncate text-lg">{me?.name ?? "Guest"}</p>
+                  <p className="text-xs font-bold text-muted">{myRank >= 0 ? `#${myRank + 1} in this room` : "Not on the table yet"}</p>
                 </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                {[
+                  ["PTS", myPoints],
+                  ["RIGHT", `${rightCount}/${calledCount}`],
+                  ["STREAK", streak],
+                ].map(([k, v]) => (
+                  <div key={k} className="rounded-xl border-2 border-ink bg-k-butter py-1.5">
+                    <p className="font-led text-3xl leading-none">{v}</p>
+                    <p className="font-led text-sm text-muted">{k}</p>
+                  </div>
+                ))}
+              </div>
+              {streak >= 2 && (
+                <p className="pop-in mt-3 flex items-center gap-1.5 rounded-lg border-2 border-ink bg-orange px-2 py-1 text-xs font-extrabold">
+                  <Art src="b2/flame" className="h-5 w-5" /> On a {streak}-call streak: +5 on every right call
+                </p>
+              )}
+            </section>
+            <TableCard board={board} names={st?.names ?? {}} meId={me?.userId} isHost={!!st?.amHost && room?.mode === "host"} roomId={id} toast={toast.show} />
+          </aside>
 
-                {/* countdown */}
+          {/* ===== CENTRE: the moment ===== */}
+          <div className={`flex flex-col gap-6 ${tab === "play" ? "" : "max-lg:hidden"}`}>
+            <section className={`brut-lg relative overflow-hidden rounded-[24px] bg-paper text-ink ${late ? "shake" : ""}`}>
+              {/* pitch strip */}
+              <div className="turf relative flex h-28 items-end justify-between border-b-[3px] border-ink px-4 pb-2 sm:h-32 sm:px-5">
+                <div className="flex flex-col items-start gap-1.5 pb-1">
+                  <span
+                    className={`font-led rounded-md border-2 border-ink px-2 text-xl shadow-[0_3px_0_#000] ${
+                      open ? "bg-lime" : phase === "pending" ? "bg-yellow" : phase === "settled" ? "bg-paper" : phase === "waiting" ? "bg-sand" : "bg-red text-white"
+                    }`}
+                  >
+                    {phaseLabel}
+                  </span>
+                  {moment?.ball && (
+                    <span className="font-led rounded-md bg-black/55 px-2 text-lg text-paper">
+                      OVER {moment.ball.over} · {moment.ball.bowler} → {moment.ball.batter}
+                    </span>
+                  )}
+                </div>
+                <Art key={bolo} src={bolo} className="pop-in -mb-6 h-28 w-28 drop-shadow-[3px_4px_0_rgba(0,0,0,.35)] sm:h-36 sm:w-36" />
+              </div>
+
+              <div className="p-5 sm:p-6">
+                <p className="text-sm font-bold text-muted">{headline}</p>
+                <h2 className="font-arcade mt-1 text-3xl leading-tight sm:text-4xl">
+                  {moment?.q ?? (st?.amHost ? "Ask the room something" : "The host is picking the moment")}
+                </h2>
+                {moment?.ball?.need && <p className="font-led mt-1 text-2xl text-orange-d">{moment.ball.need.toUpperCase()}</p>}
+
+                {/* lock fuse */}
                 {phase === "open" && lockIn !== null && (
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="inline-flex items-center gap-1">
-                        <Art src="b2/stopwatch" className="h-5 w-5" /> Locks in
-                      </span>
-                      <span className="font-mono text-base">{Math.max(0, lockIn / 1000).toFixed(1)}s</span>
+                  <div className="mt-4 flex items-center gap-2">
+                    <Art src="b2/stopwatch" className="h-7 w-7" />
+                    <div className="flex flex-1 gap-[3px]">
+                      {Array.from({ length: 24 }).map((_, k) => {
+                        const frac = Math.max(0, lockIn / Math.max(1, (moment!.lockAt ?? 0) - moment!.openAt));
+                        return <span key={k} className={`h-4 flex-1 rounded-[3px] border border-ink/40 ${k / 24 < frac ? (lockIn < 2000 ? "bg-red" : "bg-orange") : "bg-sand"}`} />;
+                      })}
                     </div>
-                    <div className="mt-1.5 h-4 overflow-hidden rounded-full border-2 border-ink bg-white">
-                      <div
-                        className={`h-full transition-[width] duration-150 ease-linear ${lockIn < 2000 ? "bg-red" : "bg-mint"}`}
-                        style={{ width: `${Math.max(0, Math.min(100, (lockIn / Math.max(1, (moment!.lockAt ?? 0) - moment!.openAt)) * 100))}%` }}
-                      />
-                    </div>
+                    <span className="font-led w-16 text-right text-3xl">{Math.max(0, lockIn / 1000).toFixed(1)}s</span>
                   </div>
                 )}
                 {phase === "open" && lockIn === null && (
@@ -528,46 +525,44 @@ export function Room({ id }: { id: string }) {
                   </p>
                 )}
 
-                {/* options */}
+                {/* options: arcade keycaps */}
                 {moment && (
-                  <div className={`mt-5 grid gap-3 ${moment.options.length > 4 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"} ${late ? "shake" : ""}`}>
+                  <div className={`mt-6 grid gap-3.5 ${moment.options.length > 4 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
                     {moment.options.map((o, i) => {
                       const count = st?.tally?.mid === moment.mid ? st.tally.counts[o.id] ?? 0 : 0;
                       const total = st?.tally?.mid === moment.mid ? st.tally.total : 0;
                       const pct = total ? Math.round((count / total) * 100) : 0;
                       const picked = myPick === o.id;
                       const isResult = phase === "settled" && shownResult?.mid === moment.mid && shownResult.outcome === o.id;
-                      const closed = phase !== "open" || clientLocked;
+                      const closed = !open;
                       return (
                         <button
                           key={o.id}
                           onClick={() => call(o.id)}
                           disabled={!me}
-                          className={`group relative overflow-hidden rounded-2xl border-[2.5px] border-ink p-3.5 text-left transition-all duration-150 ${
-                            isResult
-                              ? "bg-mint shadow-[5px_5px_0_#111]"
-                              : picked
-                                ? "bg-yellow shadow-[5px_5px_0_#111] -translate-x-0.5 -translate-y-0.5"
-                                : `${OPTION_COLORS[i % OPTION_COLORS.length]} shadow-[3px_3px_0_#111]`
-                          } ${closed ? (isResult || picked ? "" : "opacity-60") : "hover:-translate-x-0.5 hover:-translate-y-1 hover:shadow-[6px_6px_0_#111] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0_#111]"}`}
+                          className={`group relative overflow-hidden rounded-2xl border-[2.5px] border-ink text-left transition-all duration-100 ${
+                            isResult ? "bg-lime" : picked ? "bg-orange" : KEY_FACES[i % KEY_FACES.length]
+                          } ${
+                            picked || isResult
+                              ? "translate-y-[4px] shadow-[0_2px_0_#000]"
+                              : closed
+                                ? "opacity-55 shadow-[0_6px_0_#000]"
+                                : "shadow-[0_6px_0_#000] hover:-translate-y-0.5 hover:shadow-[0_8px_0_#000] active:translate-y-[5px] active:shadow-[0_1px_0_#000]"
+                          }`}
                         >
-                          <div
-                            className="absolute inset-y-0 left-0 bg-ink/[0.07] transition-[width] duration-500"
-                            style={{ width: `${pct}%` }}
-                            aria-hidden
-                          />
-                          <div className="relative flex items-center gap-3">
-                            <span className={`badge-pts ${BADGE_COLORS[i % BADGE_COLORS.length]} !h-10 !min-w-10 shrink-0 transition-transform group-hover:rotate-[-8deg] group-hover:scale-110`}>
+                          <div className="flex items-center gap-3 px-3.5 pb-3 pt-3">
+                            <span className="font-led grid h-11 min-w-11 shrink-0 place-items-center rounded-xl border-2 border-ink bg-paper px-1 text-2xl transition-transform group-hover:-rotate-6">
                               +{o.points}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="font-display truncate text-lg font-extrabold leading-tight">{o.label}</p>
-                              <p className="text-xs font-semibold text-muted">
-                                {total ? `${count} call${count === 1 ? "" : "s"} · ${pct}%` : "no calls yet"}
-                              </p>
+                              <p className="font-arcade text-[15px] leading-[1.05] [overflow-wrap:anywhere] sm:text-base">{o.label}</p>
+                              <p className="font-led text-lg leading-none text-ink/60">{total ? `${count} · ${pct}%` : "–"}</p>
                             </div>
-                            {picked && !isResult && <Art src="b2/check" className="pop-in h-8 w-8" />}
-                            {isResult && <Art src={picked ? "b2/crown" : "b2/check"} className="pop-in h-9 w-9" />}
+                            {picked && !isResult && <Art src="b2/check" className="pop-in h-9 w-9" />}
+                            {isResult && <Art src={picked ? "b2/crown" : "b2/check"} className="pop-in h-10 w-10" />}
+                          </div>
+                          <div className="h-2 border-t-2 border-ink bg-black/10">
+                            <div className="h-full bg-ink/70 transition-[width] duration-500" style={{ width: `${pct}%` }} />
                           </div>
                         </button>
                       );
@@ -576,110 +571,131 @@ export function Room({ id }: { id: string }) {
                 )}
 
                 {!moment && (
-                  <div className="mt-6 rounded-2xl border-2 border-dashed border-ink/40 bg-white/60 p-5 text-center text-sm text-muted">
+                  <div className="mt-5 rounded-2xl border-2 border-dashed border-ink/35 bg-k-butter/50 p-5 text-center text-sm text-muted">
                     {st?.amHost
-                      ? "Use the host controls below: pick a question, tap Go, then tap Lock the moment it happens."
+                      ? "Use the host controls: pick a question, tap Go, then tap Lock the moment it happens."
                       : room?.mode === "replay"
-                        ? "The replay starts in a moment…"
-                        : "Calls appear here the moment the host opens them. Chat while you wait."}
+                        ? "The first ball is coming up…"
+                        : "Calls appear here the moment the host opens them. Chat in the dugout while you wait."}
                   </div>
                 )}
 
                 {phase === "pending" && (
-                  <div className="mt-4 flex items-center gap-3 rounded-2xl border-2 border-ink bg-white p-3">
+                  <div className="mt-5 flex items-center gap-3 rounded-2xl border-2 border-ink bg-yellow p-3">
                     <Art src="b2/replay" className="h-10 w-10" />
                     <p className="text-sm font-bold">Points wait for the decision. Nobody scores until it&apos;s confirmed.</p>
                   </div>
                 )}
                 {phase === "settled" && shownResult?.mid === moment?.mid && shownResult && (
-                  <div className="rise mt-4 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-ink bg-white p-3">
+                  <div className="rise mt-5 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-ink bg-k-leaf p-3">
                     <Art src="b2/scoreboard" className="h-10 w-10" />
                     <p className="flex-1 text-sm">
                       <b>{shownResult.label}.</b> {shownResult.detail} · {shownResult.winners.length} of {shownResult.total} called it
                     </p>
-                    {myCalls[shownResult.mid] === shownResult.outcome && (
-                      <ShareCalled label={shownResult.label} room={room?.name ?? "the match"} id={id} toast={toast.show} />
-                    )}
+                    {myCalls[shownResult.mid] === shownResult.outcome && <ShareCalled label={shownResult.label} room={room?.name ?? "the match"} id={id} toast={toast.show} />}
                   </div>
                 )}
-                {delay > 0 && resultHidden && (
-                  <p className="mt-3 text-xs font-bold text-muted">🛡 Spoiler shield is holding this result for {delay}s</p>
-                )}
+                {delay > 0 && resultHidden && <p className="font-led mt-3 flex items-center gap-1.5 text-lg text-muted"><Art src="b2/lock" className="h-6 w-6" /> SPOILER SHIELD HOLDING THIS RESULT FOR {delay}S</p>}
+              </div>
 
-                {/* lock stamp */}
-                {(lockFlash > 0 || late) && (
-                  <div className="pointer-events-none absolute inset-0 grid place-items-center">
-                    <div className="stamp text-center">
-                      <Art src="d2/locked" className="w-64 drop-shadow-[6px_6px_0_rgba(0,0,0,.25)]" />
-                      {late && late !== "Locked" && <p className="mt-1 rounded-full bg-ink px-3 py-1 text-sm font-bold text-white">{late}</p>}
-                    </div>
+              {(lockFlash > 0 || late) && (
+                <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                  <div className="stamp text-center">
+                    <Art src="d2/locked" className="w-64 drop-shadow-[6px_6px_0_rgba(0,0,0,.3)]" />
+                    {late && late !== "Locked" && <p className="font-led mt-1 rounded-lg bg-ink px-3 py-0.5 text-2xl text-paper">{late.toUpperCase()}</p>}
                   </div>
-                )}
-              </section>
-
-              {st?.amHost && room?.mode === "host" && <HostPanel id={id} sport={sport} st={st} onDone={fetchState} toast={toast.show} />}
-
-              {/* recent moments */}
-              {results.length > 0 && (
-                <section className="brut rounded-3xl bg-white p-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-display text-xl font-extrabold">Recent moments</h3>
-                    <span className="badge-pts !h-8 bg-white text-xs">{results.length}</span>
-                  </div>
-                  <div className="mt-3 flex gap-2.5 overflow-x-auto pb-2 scroll-thin">
-                    {[...results]
-                      .filter((r) => r.at + delay * 1000 <= serverNow)
-                      .reverse()
-                      .map((r) => {
-                        const pick = myCalls[r.mid];
-                        const right = pick === r.outcome;
-                        return (
-                          <div
-                            key={r.mid}
-                            className={`rise min-w-[8.5rem] rounded-2xl border-2 border-ink p-3 transition-transform hover:-translate-y-1 ${pick ? (right ? "bg-t-mint" : "bg-t-pink") : "bg-t-butter"}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <p className="font-display text-lg font-extrabold">{r.label}</p>
-                              {pick && <Art src={right ? "b2/check" : "b2/cross"} className="h-6 w-6" />}
-                            </div>
-                            <p className="line-clamp-2 text-[11px] text-muted">{r.detail ?? ""}</p>
-                            <p className="mt-1 text-[11px] font-bold">
-                              {r.winners.length}/{r.total} called it
-                            </p>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </section>
+                </div>
               )}
-            </div>
+            </section>
 
-            {/* right column */}
-            <div className="flex flex-col gap-6">
-              <MiniBoard board={board} names={st?.names ?? {}} meId={me?.userId} isHost={!!st?.amHost && room?.mode === "host"} roomId={id} toast={toast.show} onMore={() => setTab("board")} />
-              <ChatBox
-                chat={chat}
-                now={now}
-                meId={me?.userId}
-                nameOf={nameOf}
-                names={st?.names ?? {}}
-                onSend={sendChat}
-                onReact={react}
-                delay={delay}
-                setDelay={setDelay}
-                muted={muted}
-                live={liveStatus === "live"}
-              />
-            </div>
+            {/* ball-by-ball strip */}
+            <section className="brut rounded-[20px] bg-stage-2 p-4">
+              <div className="flex items-center justify-between">
+                <p className="font-led text-2xl">THIS SESSION</p>
+                <p className="font-led text-xl text-on-muted">
+                  {rightCount} RIGHT · {calledCount} CALLED
+                </p>
+              </div>
+              <div className="scroll-thin mt-3 flex gap-2.5 overflow-x-auto pb-2">
+                {visibleResults.length === 0 && <p className="text-sm text-on-muted">Every settled moment lands here as a ball: green if you called it.</p>}
+                {visibleResults.map((r) => {
+                  const pick = myCalls[r.mid];
+                  const right = !!pick && pick === r.outcome;
+                  return (
+                    <div key={r.mid} className="group relative shrink-0">
+                      <div
+                        className={`rise grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink text-sm font-black shadow-[0_3px_0_#000] transition-transform group-hover:-translate-y-1 ${
+                          pick ? (right ? "bg-lime text-ink" : "bg-k-rose text-ink") : "bg-sand text-ink"
+                        }`}
+                      >
+                        {short(r.label)}
+                      </div>
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border-2 border-ink bg-paper p-2 text-xs text-ink shadow-[0_3px_0_#000] group-hover:block">
+                        <b>{r.label}</b> · {r.detail ?? ""}
+                        <br />
+                        {r.winners.length}/{r.total} called it{pick ? (right ? " · you too ✓" : " · not you") : ""}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {st?.amHost && room?.mode === "host" && <HostPanel id={id} sport={sport} st={st} onDone={fetchState} toast={toast.show} />}
           </div>
-        )}
+
+          {/* ===== RIGHT: the dugout ===== */}
+          <div className={`flex flex-col gap-6 ${tab === "chat" ? "" : "max-lg:hidden"}`}>
+            <Huddle
+              roomId={id}
+              meId={me?.userId}
+              meAvatar={me?.avatar ?? st?.names[me?.userId ?? ""]?.avatar}
+              names={st?.names ?? {}}
+              huddle={st?.huddle ?? null}
+              ready={liveStatus === "live"}
+              toast={toast.show}
+              onChange={fetchState}
+            />
+            <ChatBox
+              chat={chat}
+              now={now}
+              meId={me?.userId}
+              nameOf={nameOf}
+              names={st?.names ?? {}}
+              onSend={sendChat}
+              onReact={react}
+              delay={delay}
+              setDelay={setDelay}
+              muted={muted}
+              live={liveStatus === "live"}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* floating reactions */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-40 h-0">
+      {/* mobile tab bar */}
+      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-3 gap-1 rounded-2xl border-[2.5px] border-ink bg-stage-2 p-1.5 shadow-[0_5px_0_#000] lg:hidden">
+        {(
+          [
+            ["play", "Play", "b2/foam-finger"],
+            ["board", "Table", "b2/trophy"],
+            ["chat", "Dugout", "b2/megaphone"],
+          ] as const
+        ).map(([k, label, art]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-extrabold transition-all ${tab === k ? "bg-orange text-ink shadow-[0_3px_0_#000]" : "text-on-muted"}`}
+          >
+            <Art src={art} className="h-6 w-6" /> {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="pointer-events-none fixed inset-x-0 bottom-28 z-40 h-0">
         {floats.map((f) => (
-          <span key={f.id} className="float-up absolute text-4xl" style={{ left: `${f.x}%`, ["--r" as string]: `${(f.x - 50) / 3}deg` }}>
-            {f.e}
+          <span key={f.id} className="float-up absolute" style={{ left: `${f.x}%`, ["--r" as string]: `${(f.x - 50) / 3}deg` }}>
+            <Art src={REACTION_ART[f.e as Reaction]?.art ?? "b5/heart"} className="h-14 w-14 drop-shadow-[2px_3px_0_rgba(0,0,0,.35)]" />
           </span>
         ))}
       </div>
@@ -691,7 +707,7 @@ export function Room({ id }: { id: string }) {
       <Modal open={!!info && !me} onClose={() => (location.href = "/")}>
         <JoinSheet
           title={room ? `Join ${room.name}` : "Join the room"}
-          cta="Join the room"
+          cta="Walk in"
           busy={joining}
           error={joinErr ?? sessionError}
           onJoin={async (n, a) => {
@@ -710,33 +726,25 @@ export function Room({ id }: { id: string }) {
   );
 }
 
-function Check({ done, label, sub }: { done: boolean; label: string; sub: string }) {
-  return (
-    <div className="flex items-start gap-2.5">
-      <span
-        className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-ink text-xs font-black transition-colors ${done ? "bg-mint" : "bg-white"}`}
-      >
-        {done ? "✓" : ""}
-      </span>
-      <div>
-        <p className="text-sm font-bold leading-tight">{label}</p>
-        <p className="text-xs text-muted">{sub}</p>
-      </div>
-    </div>
-  );
+function BotTag() {
+  return <span className="font-led ml-1.5 inline-block rounded border border-current px-1 align-middle text-[13px] leading-[1.1] opacity-70">BOT</span>;
+}
+
+function short(label: string) {
+  const m: Record<string, string> = { Dot: "•", "1–3 runs": "1-3", Four: "4", Six: "6", Wicket: "W", Extra: "X" };
+  return m[label] ?? label.slice(0, 3).toUpperCase();
 }
 
 type BoardRow = { id: string; name: string; points: number };
 type Names = Record<string, { name: string; avatar: string }>;
 
-function MiniBoard({
+function TableCard({
   board,
   names,
   meId,
   isHost,
   roomId,
   toast,
-  onMore,
 }: {
   board: BoardRow[];
   names: Names;
@@ -744,114 +752,46 @@ function MiniBoard({
   isHost: boolean;
   roomId: string;
   toast: (t: string, tone?: "ink" | "red" | "mint") => void;
-  onMore: () => void;
 }) {
   async function mute(uid: string, name: string) {
     const r = await api(`/api/rooms/${roomId}/host`, { action: "mute", userId: uid, minutes: 10 });
     toast(r.ok ? `${name} is muted for 10 minutes` : (r.data as { error?: string }).error ?? "Mute failed", r.ok ? "mint" : "red");
   }
   return (
-    <section className="brut rounded-3xl bg-yellow p-5">
+    <section className="led rounded-[20px] p-4 text-paper">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Art src="b2/trophy" className="h-9 w-9" />
-          <h3 className="font-display text-xl font-extrabold">Leaderboard</h3>
-        </div>
-        <button onClick={onMore} className="text-xs font-bold underline decoration-2 underline-offset-2 hover:text-blue">
-          See all
-        </button>
+        <p className="font-led led-text text-2xl">THE TABLE</p>
+        <Art src="b2/trophy" className="h-9 w-9" />
       </div>
-      <div className="mt-3 flex flex-col gap-2">
-        {board.length === 0 && <p className="rounded-xl border-2 border-dashed border-ink/40 bg-white/60 p-3 text-sm text-muted">No points yet. First right call takes the crown.</p>}
-        {board.slice(0, 6).map((b, i) => (
+      <div className="mt-3 flex flex-col gap-1.5">
+        {board.length === 0 && <p className="font-led text-lg text-paper/55">NO POINTS YET. FIRST RIGHT CALL TAKES THE CROWN.</p>}
+        {board.slice(0, 10).map((b, i) => (
           <div
             key={b.id}
-            className={`group flex items-center gap-3 rounded-xl border-2 border-ink px-3 py-2 transition-transform hover:-translate-y-0.5 ${b.id === meId ? "bg-ink text-white" : "bg-white"}`}
+            className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors ${b.id === meId ? "bg-orange text-ink" : "hover:bg-white/5"}`}
           >
-            <span className="w-5 font-mono text-sm font-bold">{i + 1}</span>
-            <Avatar id={names[b.id]?.avatar} size={30} />
-            <span className="flex-1 truncate font-bold">
+            <span className={`font-led w-6 text-2xl ${b.id === meId ? "" : "text-yellow"}`}>{i + 1}</span>
+            <Avatar id={names[b.id]?.avatar} size={28} className="border border-ink" />
+            <span className="flex-1 truncate text-sm font-bold">
               {b.name}
               {b.id === meId && " (you)"}
+              {b.id.startsWith("bot_") && <BotTag />}
             </span>
-            {i === 0 && b.points > 0 && <Art src="b2/crown" className="h-6 w-6" />}
+            {i === 0 && b.points > 0 && <Art src="b2/crown" className="h-5 w-5" />}
             {isHost && b.id !== meId && !b.id.startsWith("bot_") && (
               <button
                 onClick={() => mute(b.id, b.name)}
-                className="hidden rounded-full border-2 border-ink bg-t-pink px-2 py-0.5 text-[10px] font-bold group-hover:inline"
+                className="hidden rounded-md border border-paper/40 px-1.5 text-[10px] font-bold hover:bg-red group-hover:inline"
                 title="Mute for 10 minutes"
               >
-                mute
+                MUTE
               </button>
             )}
-            <span className="font-display text-lg font-extrabold">{b.points}</span>
+            <span className="font-led text-2xl">{b.points}</span>
           </div>
         ))}
       </div>
     </section>
-  );
-}
-
-function BoardPage({ board, names, meId, results, myCalls }: { board: BoardRow[]; names: Names; meId?: string; results: ResultCard[]; myCalls: Record<string, string> }) {
-  const podium = [board[1], board[0], board[2]];
-  const mine = results.filter((r) => myCalls[r.mid]);
-  const right = mine.filter((r) => myCalls[r.mid] === r.outcome).length;
-  return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-      <section className="brut-lg rounded-3xl bg-white p-6">
-        <h3 className="font-display text-2xl font-extrabold">Who called it best</h3>
-        <div className="mt-6 grid grid-cols-3 items-end gap-3">
-          {podium.map((p, i) => (
-            <div key={i} className="text-center">
-              {p ? (
-                <>
-                  <div className="relative mx-auto w-fit">
-                    {i === 1 && <Art src="b2/crown" className="absolute -top-8 left-1/2 h-10 w-10 -translate-x-1/2 -rotate-6" />}
-                    <Avatar id={names[p.id]?.avatar} size={i === 1 ? 72 : 56} className="border-2 border-ink" />
-                  </div>
-                  <p className="mt-2 truncate font-bold">{p.name}</p>
-                </>
-              ) : (
-                <div className="h-20" />
-              )}
-              <div
-                className={`brut-sm mt-2 grid place-items-center rounded-t-2xl font-display text-2xl font-extrabold ${i === 1 ? "h-32 bg-yellow" : i === 0 ? "h-24 bg-lav" : "h-16 bg-pink"}`}
-              >
-                {p ? p.points : "–"}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 flex flex-col gap-2">
-          {board.map((b, i) => (
-            <div key={b.id} className={`flex items-center gap-3 rounded-xl border-2 border-ink px-3 py-2 ${b.id === meId ? "bg-ink text-white" : "bg-cream"}`}>
-              <span className="w-6 font-mono font-bold">{i + 1}</span>
-              <Avatar id={names[b.id]?.avatar} size={32} />
-              <span className="flex-1 truncate font-bold">{b.name}</span>
-              <span className="font-display text-lg font-extrabold">{b.points}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="flex flex-col gap-4">
-        <div className="brut rounded-3xl bg-t-mint p-5">
-          <p className="text-xs text-muted">Your calls</p>
-          <p className="font-display text-5xl font-extrabold">
-            {right}/{mine.length}
-          </p>
-          <p className="text-sm font-bold">right this session</p>
-        </div>
-        <div className="brut rounded-3xl bg-t-lav p-5">
-          <p className="font-display text-lg font-extrabold">How scoring works</p>
-          <ul className="mt-2 flex flex-col gap-1.5 text-sm">
-            <li>• Each answer shows its points. Rarer outcomes pay more.</li>
-            <li>• Two right in a row: +5 on every right call after.</li>
-            <li>• Calls lock on the server clock. Late taps never count.</li>
-            <li>• Reviews hold points until the decision is in.</li>
-          </ul>
-        </div>
-      </section>
-    </div>
   );
 }
 
@@ -892,16 +832,16 @@ function ChatBox({
   }, [visible.length]);
 
   return (
-    <section className="brut flex h-[30rem] flex-col rounded-3xl bg-white">
-      <div className="flex items-center justify-between border-b-2 border-ink px-5 py-3">
+    <section className="brut flex h-[34rem] flex-col overflow-hidden rounded-[20px] bg-stage-2 lg:h-[36rem]">
+      <div className="flex items-center justify-between gap-2 border-b-2 border-ink bg-stage-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <Art src="b2/megaphone" className="h-8 w-8" />
-          <h3 className="font-display text-xl font-extrabold">Banter</h3>
+          <p className="font-arcade text-lg">Dugout</p>
         </div>
         <label className="flex items-center gap-1.5 text-xs font-bold" title="Hold results and chat to match a delayed stream">
-          🛡 Spoiler shield
+          <Art src="b2/stopwatch" className="h-6 w-6" /> Shield
           <select
-            className="rounded-full border-2 border-ink bg-t-butter px-2 py-1 text-xs font-bold outline-none transition hover:bg-yellow"
+            className="font-led rounded-lg border-2 border-ink bg-paper px-1.5 text-lg text-ink outline-none transition hover:bg-yellow"
             value={delay}
             onChange={(e) => setDelay(Number(e.target.value))}
           >
@@ -915,51 +855,62 @@ function ChatBox({
       </div>
       <div ref={listRef} className="scroll-thin flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3">
         {visible.length === 0 && (
-          <div className="m-auto text-center text-sm text-muted">
+          <div className="m-auto text-center text-sm text-on-muted">
             <Art src="b5/heart" className="mx-auto mb-2 h-12 w-12" />
-            {live ? "Say hi. Links, numbers and betting talk are blocked." : "Connecting to the room…"}
+            {live ? "Say hi. Links, numbers and betting talk are blocked." : "Tuning in to the room…"}
           </div>
         )}
         {visible.map((l) =>
           l.sys ? (
-            <div key={l.id} className="rise mx-auto max-w-[90%] rounded-full border-2 border-ink bg-t-butter px-3 py-1 text-center text-xs font-bold">
+            <div key={l.id} className="font-led rise mx-auto max-w-[92%] rounded-lg border-2 border-ink bg-yellow px-3 py-0.5 text-center text-lg text-ink">
               {l.text}
             </div>
           ) : (
             <div key={l.id} className={`rise flex items-end gap-2 ${l.from === meId ? "flex-row-reverse" : ""}`}>
-              <Avatar id={names[l.from]?.avatar} size={28} />
-              <div className={`max-w-[78%] rounded-2xl border-2 border-ink px-3 py-1.5 ${l.from === meId ? "rounded-br-sm bg-yellow" : "rounded-bl-sm bg-t-sky"}`}>
-                {l.from !== meId && <p className="text-[11px] font-bold text-muted">{nameOf(l.from)}</p>}
+              <Avatar id={names[l.from]?.avatar} size={28} className="border border-ink" />
+              <div
+                className={`max-w-[78%] rounded-2xl border-2 border-ink px-3 py-1.5 text-ink shadow-[0_2px_0_#000] ${l.from === meId ? "rounded-br-sm bg-orange" : "rounded-bl-sm bg-paper"}`}
+              >
+                {l.from !== meId && (
+                  <p className="text-[11px] font-extrabold text-orange-d">
+                    {nameOf(l.from)}
+                    {l.from.startsWith("bot_") && <BotTag />}
+                  </p>
+                )}
                 <p className="break-words text-sm">{l.text}</p>
               </div>
             </div>
           ),
         )}
-        {held > 0 && <p className="text-center text-[11px] font-bold text-muted">🛡 {held} message{held > 1 ? "s" : ""} held for your stream delay</p>}
+        {held > 0 && <p className="font-led flex items-center justify-center gap-1.5 text-lg text-on-muted"><Art src="b2/stopwatch" className="h-5 w-5" /> {held} HELD FOR YOUR STREAM DELAY</p>}
       </div>
-      <div className="flex gap-1.5 border-t-2 border-ink px-4 pt-2.5">
+      <div className="flex justify-between gap-1 border-t-2 border-ink px-3 pt-2.5">
         {REACTIONS.map((e) => (
           <button
             key={e}
             onClick={() => onReact(e)}
-            className="grid h-9 w-9 place-items-center rounded-full border-2 border-ink bg-cream text-lg transition-transform hover:-translate-y-1 hover:rotate-12 hover:scale-110 active:scale-90"
-            aria-label={`React ${e}`}
+            className="grid h-11 w-11 place-items-center rounded-xl border-2 border-ink bg-paper shadow-[0_3px_0_#000] transition-all hover:-translate-y-1 hover:rotate-12 active:translate-y-[2px] active:shadow-none"
+            aria-label={REACTION_ART[e].label}
+            title={REACTION_ART[e].label}
           >
-            {e}
+            <Art src={REACTION_ART[e].art} className="h-8 w-8" />
           </button>
         ))}
       </div>
       <form
-        className="flex gap-2 p-4 pt-2.5"
+        className="flex gap-2 p-3"
         onSubmit={async (e) => {
           e.preventDefault();
           const t = text.trim();
           if (!t) return;
-          if (await onSend(t)) setText("");
+          if (await onSend(t)) {
+            setText("");
+            setWarn(null);
+          }
         }}
       >
         <input
-          className={`input !rounded-full !py-2.5 ${warn ? "!border-red" : ""}`}
+          className={`input !py-2.5 ${warn ? "!border-red" : ""}`}
           placeholder={muted ? "The host muted you for a bit" : "Say something about the match…"}
           value={text}
           maxLength={200}
@@ -969,11 +920,11 @@ function ChatBox({
             setWarn(blockReason(e.target.value));
           }}
         />
-        <button className="btn btn-dark !px-4" disabled={muted || !text.trim()}>
+        <button className="key !px-4" disabled={muted || !text.trim()}>
           Send
         </button>
       </form>
-      {warn && <p className="-mt-2 px-5 pb-3 text-xs font-bold text-red">⛔ {warn}. It won&apos;t be delivered.</p>}
+      {warn && <p className="-mt-1 flex items-center gap-1.5 px-4 pb-3 text-xs font-bold text-red"><Art src="b2/cross" className="h-5 w-5" /> {warn}. It won&apos;t be delivered.</p>}
     </section>
   );
 }
@@ -981,10 +932,10 @@ function ChatBox({
 function ShareCalled({ label, room, id, toast }: { label: string; room: string; id: string; toast: (t: string, tone?: "ink" | "red" | "mint") => void }) {
   return (
     <button
-      className="btn btn-sm"
+      className="key key-sm"
       onClick={async () => {
         const url = `${location.origin}/r/${id}`;
-        const text = `I called it 😎 "${label}" in ${room}. Think you can beat me? ${url}`;
+        const text = `I called it! "${label}" in ${room}. Think you can beat me? ${url}`;
         if (navigator.share) {
           try {
             await navigator.share({ title: "I called it", text, url });

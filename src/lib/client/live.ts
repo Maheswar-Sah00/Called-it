@@ -34,6 +34,9 @@ export type LogLine = { at: number; api: string; detail: string; ms?: number };
 type SDK = typeof import("@nexconn/chat");
 
 let sdk: SDK | null = null;
+let joinSeq = 0;
+/** How many mounted rooms hold each channel; we only exit when the last one leaves. */
+const holds = new Map<string, number>();
 let connectedAs: string | null = null;
 let initialised = false;
 
@@ -59,6 +62,14 @@ function areaCode(s: SDK) {
 async function load(appKey: string) {
   if (!sdk) sdk = await import("@nexconn/chat");
   if (!initialised) {
+    // The Call SDK's plumbing must be installed before the chat engine starts.
+    try {
+      const call = await import("@nexconn/call");
+      call.NCCallEngine.install();
+      log("NCCallEngine.install", "voice + video ready");
+    } catch (e) {
+      log("NCCallEngine.install", `failed: ${String(e).slice(0, 60)}`);
+    }
     sdk.NCEngine.initialize({ appKey, areaCode: areaCode(sdk), logLevel: sdk.LogLevel.ERROR });
     // Custom game cards must be registered before connect.
     sdk.NCEngine.registerCustomMessages([
@@ -78,6 +89,27 @@ function toMsg(m: import("@nexconn/chat").Message): LiveMsg {
   return { id: m.messageId, type: m.messageType, from: m.senderUserId, at: m.sentTime || Date.now(), content: c, text };
 }
 
+/** One connect at a time per user, shared by every caller (React may mount twice). */
+let connecting: { userId: string; p: Promise<void> } | null = null;
+function connectOnce(s: SDK, userId: string, token: string): Promise<void> {
+  if (connectedAs === userId) return Promise.resolve();
+  if (connecting?.userId === userId) return connecting.p;
+  const p = (async () => {
+    if (connectedAs) await s.NCEngine.disconnect();
+    const t0 = performance.now();
+    const r = await s.NCEngine.connect({ token });
+    log("NCEngine.connect", r.isOk ? `as ${userId}` : `failed ${r.code}`, Math.round(performance.now() - t0));
+    if (!r.isOk) throw new Error(`connect failed ${r.code}`);
+    connectedAs = userId;
+  })();
+  connecting = { userId, p };
+  p.then(
+    () => (connecting = null),
+    () => (connecting = null),
+  );
+  return p;
+}
+
 export type Live = {
   send: (text: string) => Promise<{ ok: boolean; reason?: string }>;
   react: (emoji: string) => Promise<void>;
@@ -95,7 +127,8 @@ export async function joinLive(opts: {
   const emit = opts.onEvent;
   emit({ kind: "status", status: "connecting" });
 
-  const hid = `ci-${opts.channelId}`;
+  const hid = `ci-${opts.channelId}-${++joinSeq}`;
+  holds.set(opts.channelId, (holds.get(opts.channelId) ?? 0) + 1);
   s.NCEngine.addMessageHandler(
     hid,
     new s.MessageHandler({
@@ -153,15 +186,12 @@ export async function joinLive(opts: {
   );
 
   if (connectedAs !== opts.userId) {
-    if (connectedAs) await s.NCEngine.disconnect();
-    const t0 = performance.now();
-    const r = await s.NCEngine.connect({ token: opts.token });
-    log("NCEngine.connect", r.isOk ? `as ${opts.userId}` : `failed ${r.code}`, Math.round(performance.now() - t0));
-    if (!r.isOk) {
-      emit({ kind: "status", status: "offline", detail: `connect ${r.code}` });
-      throw new Error(`connect failed ${r.code}`);
+    try {
+      await connectOnce(s, opts.userId, opts.token);
+    } catch (e) {
+      emit({ kind: "status", status: "offline", detail: String(e) });
+      throw e;
     }
-    connectedAs = opts.userId;
   }
 
   const ch = new s.OpenChannel(opts.channelId);
@@ -187,7 +217,13 @@ export async function joinLive(opts: {
   return {
     async send(text) {
       const t = performance.now();
-      const r = await ch.sendMessage(new s.SendTextMessageParams({ text }));
+      let r = await ch.sendMessage(new s.SendTextMessageParams({ text }));
+      if (!r.isOk && r.code === 23406) {
+        // not in the channel any more (network blip, tab sleep): walk back in and retry once
+        const back = await ch.enterChannel({ messageCount: 0 });
+        log("OpenChannel.enterChannel", back.isOk ? "re-entered after 23406" : `re-enter failed ${back.code}`);
+        if (back.isOk) r = await ch.sendMessage(new s.SendTextMessageParams({ text }));
+      }
       log("OpenChannel.sendMessage", r.isOk ? "RC:TxtMsg" : `refused ${r.code}`, Math.round(performance.now() - t));
       if (r.isOk && r.data) {
         emit({ kind: "msg", msg: toMsg(r.data) });
@@ -203,7 +239,12 @@ export async function joinLive(opts: {
       s.NCEngine.removeMessageHandler?.(hid);
       s.NCEngine.removeOpenChannelHandler?.(hid);
       s.NCEngine.removeConnectionStatusHandler?.(hid);
-      await ch.exitChannel().catch(() => null);
+      const left = (holds.get(opts.channelId) ?? 1) - 1;
+      holds.set(opts.channelId, left);
+      if (left <= 0) {
+        holds.delete(opts.channelId);
+        await ch.exitChannel().catch(() => null);
+      }
     },
   };
 }

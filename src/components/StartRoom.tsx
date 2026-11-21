@@ -68,7 +68,7 @@ export function StartRoom({ open, onClose, sport: initial }: { open: boolean; on
                 key={s}
                 onClick={() => setSport(s)}
                 className={`brut-sm group flex flex-col items-center rounded-2xl px-1 pb-2 pt-1 transition-all hover:-translate-y-1 ${
-                  sport === s ? "bg-yellow" : "bg-white hover:bg-t-butter"
+                  sport === s ? "bg-yellow" : "bg-paper hover:bg-k-butter"
                 }`}
                 aria-pressed={sport === s}
               >
@@ -86,12 +86,12 @@ export function StartRoom({ open, onClose, sport: initial }: { open: boolean; on
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !busy && create()}
           />
-          {err && <p className="mt-3 rounded-xl border-2 border-ink bg-t-pink px-3 py-2 text-sm font-semibold">{err}</p>}
+          {err && <p className="mt-3 rounded-xl border-2 border-ink bg-k-rose px-3 py-2 text-sm font-semibold">{err}</p>}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted">
               Hosting as <b className="text-ink">{info?.session?.name}</b>
             </p>
-            <button className="btn text-lg" onClick={create} disabled={busy}>
+            <button className="key text-lg" onClick={create} disabled={busy}>
               {busy ? "Opening the room…" : "Open my room →"}
             </button>
           </div>

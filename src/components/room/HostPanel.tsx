@@ -42,7 +42,7 @@ export function HostPanel({
   }
 
   return (
-    <section className="brut-lg rounded-3xl bg-white p-5 sm:p-6">
+    <section className="brut-lg rounded-[24px] bg-paper p-5 text-ink sm:p-6">
       <div className="flex items-center gap-3">
         <Art src={SPORT_ART[sport].official} className="h-16 w-16" />
         <div>
@@ -61,7 +61,7 @@ export function HostPanel({
               </button>
             ))}
             <button className="chip" data-on={preset === "custom"} onClick={() => setPreset("custom")}>
-              ✏️ Write my own
+              Write my own
             </button>
           </div>
           {preset === "custom" && (
@@ -92,7 +92,7 @@ export function HostPanel({
           <p className="mt-5 text-xs font-bold uppercase tracking-wider">Score line (optional)</p>
           <input className="input mt-2 !py-2 text-sm" placeholder="e.g. IND 182/4 · 18.2 ov" value={score} maxLength={60} onChange={(e) => setScore(e.target.value)} />
           <button
-            className="btn mt-5 w-full text-lg"
+            className="key mt-5 w-full text-lg"
             disabled={!!busy}
             onClick={() =>
               act("open", preset === "custom" ? { q, labels, seconds: secs } : { preset, seconds: secs })
@@ -105,7 +105,7 @@ export function HostPanel({
         <div className="rise mt-5 flex flex-col gap-4">
           {m.state === "open" && (
             <button
-              className="btn w-full !bg-red py-5 text-2xl text-white"
+              className="key w-full !bg-red py-5 text-2xl text-white"
               disabled={!!busy}
               onClick={() => act("lock")}
             >
@@ -118,7 +118,7 @@ export function HostPanel({
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {m.options.map((o) => (
-                <button key={o.id} className="btn btn-white" disabled={!!busy} onClick={() => act("result", { outcome: o.id, detail: detail || undefined })}>
+                <button key={o.id} className="key key-paper" disabled={!!busy} onClick={() => act("result", { outcome: o.id, detail: detail || undefined })}>
                   {o.label}
                 </button>
               ))}
@@ -127,7 +127,7 @@ export function HostPanel({
             <input className="input mt-2 !py-2 text-sm" placeholder="Update the score line" value={score} maxLength={60} onChange={(e) => setScore(e.target.value)} />
           </div>
           {m.state !== "pending" && (
-            <button className="btn btn-white w-full" disabled={!!busy} onClick={() => act("pending", { reason: sport === "football" ? "VAR check" : sport === "cricket" ? "DRS review" : "Under review" })}>
+            <button className="key key-paper w-full" disabled={!!busy} onClick={() => act("pending", { reason: sport === "football" ? "VAR check" : sport === "cricket" ? "DRS review" : "Under review" })}>
               <Art src="b2/replay" className="h-6 w-6" /> Hold points: it&apos;s under review
             </button>
           )}

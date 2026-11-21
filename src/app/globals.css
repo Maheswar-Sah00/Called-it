@@ -1,188 +1,275 @@
 @import "tailwindcss";
 
-/* Called It design system — neo-brutalist, retro-arcade, Off Campus style. */
+/* Called It — "Floodlights & arcade": a warm stadium night, LED scoreboards,
+   matchday tickets, chunky arcade keycaps. No blue anywhere. */
 :root {
-  --blue: #2f55e4;
-  --blue-deep: #2546c7;
-  --yellow: #ffe45c;
-  --cream: #fff4cc;
-  --paper: #fffaf0;
-  --mint: #3ddc97;
-  --pink: #ff6fb5;
-  --lav: #b9a3ff;
-  --red: #ff4d3d;
-  --lime: #dcf25a;
-  --ink: #111111;
-  --night: #1d1a2b;
-  --muted: #4b4b55;
+  --night: #1f120d; /* espresso night */
+  --night-2: #2c1a12; /* panel */
+  --night-3: #3e2619; /* raised panel */
+  --ink: #140b08;
+  --paper: #fff7e8;
+  --cream: #ffefd2;
+  --sand: #f4dcb8;
+  --orange: #ff7a1a; /* call-it orange: primary */
+  --orange-d: #d95f08;
+  --yellow: #ffd23f; /* LED amber */
+  --red: #f2412d; /* lock */
+  --turf: #2f8f46;
+  --turf-2: #3aa656;
+  --chalk: #23402c; /* tactics board */
+  --pink: #ff6f9f;
+  --lime: #c6f04d;
+  --muted: #6e5a4c;
 
-  --t-pink: #ffe1ef;
-  --t-mint: #dbf6e8;
-  --t-peach: #ffe6d2;
-  --t-sky: #dcefff;
-  --t-lav: #ebe5ff;
-  --t-lime: #eef8cf;
-  --t-butter: #fff3b8;
+  --k-peach: #ffd2ad;
+  --k-butter: #ffe79c;
+  --k-leaf: #cdeeb4;
+  --k-rose: #ffc6d6;
+  --k-sand: #f6dcb6;
+  --k-lime: #e5f6a6;
+
+  /* themed stage (night is the default; day overrides below) */
+  --stage: #1f120d;
+  --stage-2: #2c1a12;
+  --stage-3: #3e2619;
+  --on: #fff7e8;
+  --on-muted: rgba(255, 247, 232, 0.68);
+  --line: rgba(255, 247, 232, 0.14);
+  --glow-a: rgba(255, 228, 160, 0.16);
+  --glow-b: rgba(255, 122, 26, 0.18);
+}
+
+/* Day: a sunny matchday afternoon. */
+:root[data-theme="day"] {
+  --stage: #ffe6c2;
+  --stage-2: #fff3df;
+  --stage-3: #f7d6a8;
+  --on: #140b08;
+  --on-muted: #6e5a4c;
+  --line: rgba(20, 11, 8, 0.14);
+  --glow-a: rgba(255, 255, 255, 0.55);
+  --glow-b: rgba(255, 166, 61, 0.35);
+}
+:root[data-theme="day"] .night-only {
+  display: none !important;
+}
+:root:not([data-theme="day"]) .day-only {
+  display: none !important;
 }
 
 @theme inline {
-  --color-blue: var(--blue);
-  --color-blue-deep: var(--blue-deep);
-  --color-yellow: var(--yellow);
-  --color-cream: var(--cream);
-  --color-paper: var(--paper);
-  --color-mint: var(--mint);
-  --color-pink: var(--pink);
-  --color-lav: var(--lav);
-  --color-red: var(--red);
-  --color-lime: var(--lime);
-  --color-ink: var(--ink);
   --color-night: var(--night);
+  --color-night-2: var(--night-2);
+  --color-night-3: var(--night-3);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-cream: var(--cream);
+  --color-sand: var(--sand);
+  --color-orange: var(--orange);
+  --color-orange-d: var(--orange-d);
+  --color-yellow: var(--yellow);
+  --color-red: var(--red);
+  --color-turf: var(--turf);
+  --color-turf-2: var(--turf-2);
+  --color-chalk: var(--chalk);
+  --color-pink: var(--pink);
+  --color-lime: var(--lime);
   --color-muted: var(--muted);
-  --color-t-pink: var(--t-pink);
-  --color-t-mint: var(--t-mint);
-  --color-t-peach: var(--t-peach);
-  --color-t-sky: var(--t-sky);
-  --color-t-lav: var(--t-lav);
-  --color-t-lime: var(--t-lime);
-  --color-t-butter: var(--t-butter);
+  --color-k-peach: var(--k-peach);
+  --color-k-butter: var(--k-butter);
+  --color-k-leaf: var(--k-leaf);
+  --color-k-rose: var(--k-rose);
+  --color-k-sand: var(--k-sand);
+  --color-k-lime: var(--k-lime);
+  --color-stage: var(--stage);
+  --color-stage-2: var(--stage-2);
+  --color-stage-3: var(--stage-3);
+  --color-on: var(--on);
+  --color-on-muted: var(--on-muted);
+  --color-line: var(--line);
   --font-sans: var(--font-body);
-  --font-display: var(--font-display);
-  --font-slab: var(--font-slab);
-  --font-mono: var(--font-mono);
 }
 
 html {
   scroll-behavior: smooth;
 }
 body {
-  background: var(--cream);
-  color: var(--ink);
+  background: var(--stage);
+  color: var(--on);
+  transition: background-color 0.6s ease, color 0.6s ease;
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 ::selection {
-  background: var(--yellow);
+  background: var(--orange);
   color: var(--ink);
 }
 
-/* ---------- primitives ---------- */
+/* ---------- type ---------- */
 .font-display {
   font-family: var(--font-display), system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
-.font-slab {
-  font-family: var(--font-slab), Georgia, serif;
+.font-arcade {
+  font-family: var(--font-arcade), system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+.font-led {
+  font-family: var(--font-led), ui-monospace, monospace;
+  letter-spacing: 0.04em;
+}
+.led-text {
+  color: var(--yellow);
+  text-shadow: 0 0 6px rgba(255, 210, 63, 0.55), 0 0 18px rgba(255, 122, 26, 0.35);
 }
 
+/* ---------- surfaces ---------- */
 .brut {
   border: 2.5px solid var(--ink);
-  box-shadow: 5px 5px 0 var(--ink);
+  box-shadow: 5px 5px 0 #000;
 }
 .brut-sm {
   border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 3px 3px 0 #000;
 }
 .brut-lg {
   border: 3px solid var(--ink);
-  box-shadow: 7px 7px 0 var(--ink);
+  box-shadow: 8px 8px 0 #000;
+}
+/* LED dot-matrix panel */
+.led {
+  background-color: #120a07;
+  background-image: radial-gradient(rgba(255, 210, 63, 0.09) 1.1px, transparent 1.3px);
+  background-size: 6px 6px;
+  border: 3px solid #000;
+  box-shadow: inset 0 0 0 3px #3e2619, 6px 6px 0 #000;
+}
+/* CRT scanlines */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  border-radius: inherit;
+}
+/* mown turf */
+.turf {
+  background: repeating-linear-gradient(90deg, var(--turf) 0 64px, var(--turf-2) 64px 128px);
+}
+/* chalk tactics board */
+.chalkboard {
+  background-color: var(--chalk);
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.05), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.04), transparent 40%);
+}
+/* paper grain for cream sections */
+.paper {
+  background-color: var(--cream);
+  background-image: radial-gradient(rgba(20, 11, 8, 0.06) 1px, transparent 1px);
+  background-size: 14px 14px;
+  color: var(--ink);
 }
 
-/* Buttons: lift on hover, press flat on click. */
-.btn {
+/* Matchday ticket: notched sides + perforation */
+.ticket {
+  --notch: 13px;
+  position: relative;
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 18px;
+  -webkit-mask:
+    radial-gradient(circle var(--notch) at 0 calc(100% - 46px), transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% calc(100% - 46px), transparent 98%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle var(--notch) at 0 calc(100% - 46px), transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% calc(100% - 46px), transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.perf {
+  border-top: 2.5px dashed rgba(20, 11, 8, 0.35);
+}
+
+/* ---------- buttons ---------- */
+/* Arcade keycap: a thick bottom edge that you press into. */
+.key {
+  --edge: #000;
+  --face: var(--orange);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   border: 2.5px solid var(--ink);
-  border-radius: 999px;
-  background: var(--yellow);
+  border-radius: 14px;
+  background: var(--face);
   color: var(--ink);
   font-weight: 800;
-  padding: 0.7rem 1.5rem;
-  box-shadow: 3px 3px 0 var(--ink);
-  transition: transform 0.14s cubic-bezier(0.3, 0.7, 0.4, 1.4), box-shadow 0.14s ease, background 0.15s ease;
+  padding: 0.7rem 1.4rem;
+  box-shadow: 0 6px 0 var(--edge);
+  transform: translateY(0);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.15s ease;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
-.btn:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 5px 5px 0 var(--ink);
+.key:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0 var(--edge);
+  filter: brightness(1.06);
 }
-.btn:active {
-  transform: translate(3px, 3px);
-  box-shadow: 0 0 0 var(--ink);
-  transition-duration: 0.05s;
+.key:active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--edge);
+  transition-duration: 0.04s;
 }
-.btn:focus-visible {
-  outline: 3px solid var(--pink);
+.key:focus-visible {
+  outline: 3px solid var(--yellow);
   outline-offset: 3px;
 }
-.btn:disabled {
+.key:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 0 6px 0 var(--edge);
 }
-.btn-dark {
-  background: var(--ink);
+.key-yellow {
+  --face: var(--yellow);
+}
+.key-paper {
+  --face: var(--paper);
+}
+.key-dark {
+  --face: var(--night-3);
+  color: var(--paper);
+}
+.key-red {
+  --face: var(--red);
   color: #fff;
-  box-shadow: 3px 3px 0 var(--yellow);
 }
-.btn-dark:hover {
-  box-shadow: 5px 5px 0 var(--yellow);
-}
-.btn-white {
-  background: #fff;
-}
-.btn-sm {
-  padding: 0.4rem 0.95rem;
+.key-sm {
+  padding: 0.4rem 0.9rem;
   font-size: 0.85rem;
-  border-width: 2px;
+  border-radius: 11px;
+  box-shadow: 0 4px 0 var(--edge);
+}
+.key-sm:hover {
+  box-shadow: 0 6px 0 var(--edge);
+}
+.key-sm:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--edge);
 }
 
-/* Cards that lift on hover. */
 .lift {
   transition: transform 0.18s cubic-bezier(0.3, 0.7, 0.4, 1.3), box-shadow 0.18s ease;
 }
 .lift:hover {
-  transform: translate(-3px, -3px);
-  box-shadow: 8px 8px 0 var(--ink);
-}
-.lift:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0 var(--ink);
-}
-
-/* Tilted "sticker" cards straighten on hover. */
-.tilt-l {
-  transform: rotate(-3deg);
-}
-.tilt-r {
-  transform: rotate(3deg);
-}
-.tilt-l,
-.tilt-r {
-  transition: transform 0.25s cubic-bezier(0.3, 0.7, 0.4, 1.4);
-}
-.tilt-l:hover,
-.tilt-r:hover {
-  transform: rotate(0deg) translateY(-8px) scale(1.03);
-}
-
-.badge-pts {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.6rem;
-  height: 2.6rem;
-  padding: 0 0.4rem;
-  border-radius: 999px;
-  border: 2px solid var(--ink);
-  font-weight: 800;
-  font-size: 0.85rem;
-  box-shadow: 2px 2px 0 var(--ink);
+  transform: translate(-3px, -4px) rotate(-0.6deg);
+  box-shadow: 9px 10px 0 #000;
 }
 
 .chip {
@@ -190,68 +277,141 @@ body {
   align-items: center;
   gap: 0.35rem;
   border: 2px solid var(--ink);
-  border-radius: 999px;
-  padding: 0.25rem 0.75rem;
+  border-radius: 10px;
+  padding: 0.3rem 0.75rem;
   font-weight: 700;
   font-size: 0.8rem;
-  background: #fff;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 3px 0 #000;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.12s ease;
   cursor: pointer;
 }
 .chip:hover {
-  transform: translateY(-2px);
-  box-shadow: 2px 3px 0 var(--ink);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #000;
+}
+.chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000;
 }
 .chip[data-on="true"] {
-  background: var(--ink);
-  color: #fff;
+  background: var(--orange);
 }
 
 .input {
   width: 100%;
   border: 2.5px solid var(--ink);
-  border-radius: 14px;
+  border-radius: 12px;
   background: #fff;
+  color: var(--ink);
   padding: 0.75rem 1rem;
   font-weight: 600;
   outline: none;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.15s ease;
 }
 .input:focus {
-  box-shadow: 4px 4px 0 var(--pink);
-  transform: translate(-1px, -1px);
+  box-shadow: 0 0 0 3px var(--orange);
 }
 
-/* ---------- the wordmark ---------- */
-.wordmark {
-  font-family: var(--font-slab), Georgia, serif;
-  color: var(--cream);
-  -webkit-text-stroke: 0.045em var(--ink);
-  paint-order: stroke fill;
-  line-height: 0.88;
+/* ---------- wordmark ---------- */
+/* Layered sticker wordmark: black outline + 3D extrude, red rim, amber fill, moving glint. */
+.wm {
+  position: relative;
+  display: inline-grid;
+  font-family: var(--font-wm), var(--font-arcade), system-ui, sans-serif;
+  line-height: 0.92;
   letter-spacing: 0.01em;
+  transform: rotate(-3deg) skewX(-7deg);
+  transform-origin: left center;
+  white-space: nowrap;
+}
+.wm > span {
+  grid-area: 1 / 1;
+  display: block;
+}
+.wm-back {
+  color: #000;
+  -webkit-text-stroke: 0.17em #000;
   text-shadow:
-    0.03em 0.03em 0 var(--ink),
-    0.06em 0.06em 0 var(--ink),
-    0.09em 0.09em 0 var(--ink),
-    0.12em 0.12em 0 var(--ink);
+    0.02em 0.03em 0 #000,
+    0.04em 0.06em 0 #000,
+    0.06em 0.09em 0 #000,
+    0.08em 0.12em 0 #000,
+    0.1em 0.15em 0 #000;
+}
+.wm-rim {
+  color: var(--red);
+  -webkit-text-stroke: 0.075em var(--red);
+}
+.wm-front {
+  background:
+    linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.95) 46%, transparent 54%) -160% 0 / 260% 100% no-repeat,
+    linear-gradient(180deg, #fffbe6 0%, #ffe27a 28%, #ffc23a 55%, var(--orange) 85%, #f05a22 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: wm-glint 5.5s ease-in-out infinite;
+}
+@keyframes wm-glint {
+  0%,
+  62% {
+    background-position: -160% 0, 0 0;
+  }
+  82%,
+  100% {
+    background-position: 260% 0, 0 0;
+  }
+}
+.wm-small {
+  font-family: var(--font-wm), system-ui, sans-serif;
+  color: var(--yellow);
+  -webkit-text-stroke: 0.09em #000;
+  paint-order: stroke fill;
+  text-shadow: 0.05em 0.07em 0 #000;
+  letter-spacing: 0.02em;
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+:root[data-theme="day"] .wm-small {
+  color: var(--orange);
 }
 
-/* ---------- ticker ---------- */
-.ticker {
+/* LED-style block wordmark kept for scoreboards */
+.wordmark {
+  font-family: var(--font-arcade), system-ui, sans-serif;
+  line-height: 0.9;
+  color: var(--yellow);
+}
+
+/* ---------- floodlights ---------- */
+.flood {
+  background:
+    conic-gradient(from 155deg at 8% -6%, transparent 0deg, var(--glow-a) 12deg, transparent 30deg),
+    conic-gradient(from 175deg at 92% -6%, transparent 0deg, var(--glow-a) 18deg, transparent 36deg),
+    radial-gradient(ellipse 60% 45% at 50% 0%, var(--glow-b), transparent 70%),
+    var(--stage);
+  transition: background-color 0.6s ease;
+}
+:root[data-theme="day"] .flood {
+  background:
+    radial-gradient(circle at 84% 12%, rgba(255, 244, 196, 0.95) 0 70px, rgba(255, 210, 63, 0.45) 71px 120px, transparent 260px),
+    linear-gradient(180deg, #ffd59a 0%, #ffe6c2 55%, var(--stage) 100%);
+}
+
+/* ---------- marquee ---------- */
+.marquee {
   overflow: hidden;
   white-space: nowrap;
-  border-block: 2.5px solid var(--ink);
-  background: var(--lime);
 }
-.ticker-track {
+.marquee-track {
   display: inline-flex;
-  animation: ticker 38s linear infinite;
+  animation: marquee 36s linear infinite;
 }
-.ticker:hover .ticker-track {
+.marquee:hover .marquee-track {
   animation-play-state: paused;
 }
-@keyframes ticker {
+@keyframes marquee {
   to {
     transform: translateX(-50%);
   }
@@ -274,11 +434,9 @@ body {
   0%,
   100% {
     opacity: 1;
-    transform: scale(1);
   }
   50% {
-    opacity: 0.4;
-    transform: scale(0.7);
+    opacity: 0.25;
   }
 }
 .twinkle {
@@ -380,10 +538,10 @@ body {
 }
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 77, 61, 0.55);
+    box-shadow: 0 0 0 0 rgba(242, 65, 45, 0.6);
   }
   100% {
-    box-shadow: 0 0 0 12px rgba(255, 77, 61, 0);
+    box-shadow: 0 0 0 10px rgba(242, 65, 45, 0);
   }
 }
 .live-dot {
@@ -393,11 +551,28 @@ body {
   background: var(--red);
   animation: pulse-ring 1.4s ease-out infinite;
 }
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+.blink {
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes ball-roll {
+  from {
+    transform: translateX(-60px) rotate(0deg);
+  }
+  to {
+    transform: translateX(calc(100vw + 60px)) rotate(900deg);
+  }
+}
 .scroll-thin::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: var(--ink);
+  background: var(--night-3);
   border-radius: 99px;
 }
 
@@ -410,3 +585,6 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* small brand mark reads better as solid ink on the day sky */
+

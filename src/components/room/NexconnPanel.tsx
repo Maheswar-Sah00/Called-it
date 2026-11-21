@@ -35,14 +35,14 @@ export function NexconnPanel({
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="brut-sm fixed bottom-4 left-4 z-40 max-sm:bottom-auto max-sm:top-20 max-sm:left-auto max-sm:right-3 flex items-center gap-2 rounded-full bg-night px-4 py-2 text-xs font-bold text-white transition-transform hover:-translate-y-1"
+        className="brut-sm fixed bottom-4 left-4 z-40 max-lg:bottom-[5.6rem] flex items-center gap-2 rounded-full bg-night px-4 py-2 text-xs font-bold text-white transition-transform hover:-translate-y-1"
       >
-        <span className={`h-2.5 w-2.5 rounded-full ${live === "live" ? "bg-mint" : "bg-[#888]"}`} />
+        <span className={`h-2.5 w-2.5 rounded-full ${live === "live" ? "bg-lime" : "bg-[#888]"}`} />
         <span className="hidden sm:inline">Nexconn inside</span>
         <span className="sm:hidden">N</span>
       </button>
       <aside
-        className={`fixed bottom-16 left-4 z-40 max-sm:bottom-auto max-sm:top-32 max-sm:left-3 w-[min(26rem,calc(100vw-2rem))] origin-bottom-left transition-all duration-300 ${
+        className={`fixed bottom-16 left-4 z-40 max-lg:bottom-[8.6rem] w-[min(26rem,calc(100vw-2rem))] origin-bottom-left transition-all duration-300 ${
           open ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"
         }`}
       >
@@ -61,7 +61,7 @@ export function NexconnPanel({
               ["chats", stats.chats],
               ["blocked", stats.blocked + stats.forged],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-xl border-2 border-white/20 bg-white/5 p-2">
+              <div key={k} className="rounded-xl border-2 border-white/20 bg-paper/5 p-2">
                 <p className="font-display text-xl font-extrabold text-yellow">{v}</p>
                 <p className="text-[10px] uppercase tracking-wider text-white/60">{k}</p>
               </div>

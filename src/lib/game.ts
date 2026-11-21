@@ -245,9 +245,13 @@ export const MT = {
   Pending: "CI:Pending",
   Result: "CI:Result",
   React: "CI:React",
+  Huddle: "CI:Huddle",
 } as const;
 
-export const CARD_TYPES: string[] = [MT.Moment, MT.Lock, MT.Tally, MT.Pending, MT.Result];
+export const CARD_TYPES: string[] = [MT.Moment, MT.Lock, MT.Tally, MT.Pending, MT.Result, MT.Huddle];
+
+/** A live voice/video huddle in a room (Nexconn Call SDK, multi-party). */
+export type HuddleInfo = { callId: string; media: "voice" | "video"; by: string; byName: string; at: number } | null;
 
 export type BallInfo = { over: string; bowler: string; batter: string; score: string; need?: string };
 
@@ -296,6 +300,7 @@ export type RoomState = {
   names: Record<string, { name: string; avatar: string }>;
   amHost: boolean;
   scoreline: string | null;
+  huddle: HuddleInfo;
   replay?: { index: number; nextAt: number; phase: string; total: number; title: string; setup: string } | null;
 };
 
@@ -331,4 +336,14 @@ export const AVATARS = [
   "gym", "popcorn", "dad-baby", "nurse", "gamer", "radio-grandpa",
 ] as const;
 
-export const REACTIONS = ["🔥", "😱", "😂", "👏", "💀", "🙏"] as const;
+/** Reactions are our own stickers, sent as keys (never system emoji). */
+export const REACTIONS = ["fire", "whoa", "cheer", "party", "ouch", "love"] as const;
+export type Reaction = (typeof REACTIONS)[number];
+export const REACTION_ART: Record<Reaction, { art: string; label: string }> = {
+  fire: { art: "b2/flame", label: "On fire" },
+  whoa: { art: "b5/bolt", label: "Whoa" },
+  cheer: { art: "b2/foam-finger", label: "Come on!" },
+  party: { art: "b2/popper", label: "Party" },
+  ouch: { art: "b3/facepalm", label: "Ouch" },
+  love: { art: "b5/heart", label: "Love it" },
+};

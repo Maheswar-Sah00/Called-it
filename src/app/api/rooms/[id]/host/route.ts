@@ -72,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       case "say": {
         const text = (b.text ?? "").toString().slice(0, 140);
         if (!text) return { error: "Empty" };
-        await sendToRoom(room.channelId, "RC:TxtMsg", { content: `📣 ${text}` }, { priority: 2 });
+        await sendToRoom(room.channelId, "RC:TxtMsg", { content: `HOST: ${text}` }, { priority: 2 });
         return { said: true };
       }
       default:

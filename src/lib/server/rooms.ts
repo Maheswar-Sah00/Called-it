@@ -8,6 +8,7 @@ import {
   type MomentCard,
   type Option,
   type ResultCard,
+  type HuddleInfo,
   type RoomPublic,
   type RoomState,
   type Sport,
@@ -52,6 +53,7 @@ const K = {
   board: (id: string) => `room:${id}:board`,
   streak: (id: string) => `room:${id}:streak`,
   result: (id: string) => `room:${id}:last`,
+  huddle: (id: string) => `room:${id}:huddle`,
   replay: (id: string) => `room:${id}:replay`,
   tickLease: (id: string) => `room:${id}:tick`,
   hostLease: (id: string) => `room:${id}:hostop`,
@@ -165,6 +167,7 @@ export async function roomState(roomId: string, userId: string | null): Promise<
     board: await board(roomId),
     myCall,
     names: await roomNames(roomId),
+    huddle: await getJSON<HuddleInfo>(K.huddle(roomId)),
     amHost: !!userId && userId === room.hostId,
     scoreline: m.scoreline || lastResult?.scoreline || null,
     replay,
@@ -335,7 +338,7 @@ export async function tick(room: RoomPublic) {
     if (!b) {
       if (st.phase !== "done") {
         await setJSON(K.replay(room.id), { ...st, phase: "done", nextAt: Number.MAX_SAFE_INTEGER });
-        await sendToRoom(room.channelId, "RC:TxtMsg", { content: "🏆 India win by 7 runs. World champions. Final board above." }, { priority: 2 });
+        await sendToRoom(room.channelId, "RC:TxtMsg", { content: "FULL TIME: India win by 7 runs. World champions." }, { priority: 2 });
       }
       return { acted: false };
     }
@@ -385,6 +388,16 @@ function ballNo(index: number) {
     if (x.over === b.over && x.outcome !== "WD" && x.outcome !== "NB") n++;
   }
   return Math.min(Math.max(n, 1), 6);
+}
+
+export async function setHuddle(room: RoomPublic, h: HuddleInfo) {
+  if (h) await setJSON(K.huddle(room.id), h, 60 * 60 * 6);
+  else await setJSON(K.huddle(room.id), null, 60);
+  await sendToRoom(room.channelId, MT.Huddle, { huddle: h }, { priority: 2, persist: false });
+}
+
+export async function getHuddle(roomId: string) {
+  return getJSON<HuddleInfo>(K.huddle(roomId));
 }
 
 export function presetsFor(sport: Sport) {

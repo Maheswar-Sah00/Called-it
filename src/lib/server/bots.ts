@@ -3,15 +3,15 @@ import type { Option } from "@/lib/game";
 
 /**
  * Demo friends for the judge demo only. They exist only in demo rooms, are
- * labelled "🤖 demo" in the UI, never get Nexconn tokens, and are excluded from
+ * labelled with a BOT chip in the UI, never get Nexconn tokens, and are excluded from
  * every traction number. Their calls go through the same code path as people's.
  */
 export const BOT_NAMES: Record<string, string> = {
-  bot_aman: "Aman 🤖",
-  bot_priya: "Priya 🤖",
-  bot_kabir: "Kabir 🤖",
-  bot_meera: "Meera 🤖",
-  bot_dev: "Dev 🤖",
+  bot_aman: "Aman",
+  bot_priya: "Priya",
+  bot_kabir: "Kabir",
+  bot_meera: "Meera",
+  bot_dev: "Dev",
 };
 
 export const BOT_AVATARS: Record<string, string> = {
@@ -43,10 +43,10 @@ export function botCall(options: Option[], botId: string): string {
 }
 
 export function botLine(outcome: string, detail?: string): string | null {
-  if (outcome === "W" && detail?.includes("Yadav")) return "SKY WHAT A CATCH 😱😱😱";
-  if (outcome === "W") return "GONE!! 🔥 Called it 😎";
-  if (outcome === "6") return "That's out of the ground 🚀";
-  if (outcome === "4") return "Four! Pressure's back on 😬";
-  if (outcome === "0" && Math.random() < 0.3) return "Bumrah is unreal 🙌";
+  if (outcome === "W" && detail?.includes("Yadav")) return "SKY WHAT A CATCH!!!";
+  if (outcome === "W") return "GONE!! Called it";
+  if (outcome === "6") return "That's out of the ground";
+  if (outcome === "4") return "Four! Pressure's back on";
+  if (outcome === "0" && Math.random() < 0.3) return "Bumrah is unreal";
   return null;
 }
