@@ -10,8 +10,12 @@ type Impact = { users: number; rooms: number; calls: number; callers: number; bl
 /** Real usage only. Demo rooms and bots are excluded from every number. */
 export default function ImpactPage() {
   const [d, setD] = useState<Impact | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    const load = () => api<Impact>("/api/impact").then((r) => r.ok && setD(r.data));
+    const load = () =>
+      api<Impact>("/api/impact")
+        .then((r) => (r.ok ? (setD(r.data), setFailed(false)) : setFailed(true)))
+        .catch(() => setFailed(true));
     load();
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
@@ -40,17 +44,17 @@ export default function ImpactPage() {
           </p>
         </div>
       </div>
-      <div className="mx-auto -mt-10 grid max-w-6xl gap-5 px-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mx-auto -mt-10 grid max-w-6xl grid-cols-2 gap-3 px-4 sm:gap-5 lg:grid-cols-5">
         {tiles.map((t, i) => (
-          <div key={t.k} className={`brut lift rise rounded-3xl ${t.bg} p-5 text-ink`} style={{ animationDelay: `${i * 60}ms` }}>
-            <Art src={t.art} className="h-14 w-14 rounded-full" />
-            <p className="font-led mt-3 text-7xl leading-none">{t.v ?? "…"}</p>
+          <div key={t.k} className={`brut lift rise rounded-3xl ${t.bg} p-4 text-ink sm:p-5 ${i === 4 ? "col-span-2 lg:col-span-1" : ""}`} style={{ animationDelay: `${i * 60}ms` }}>
+            <Art src={t.art} className="h-10 w-10 rounded-full sm:h-14 sm:w-14" />
+            <p className="font-led mt-2 text-5xl leading-none sm:mt-3 sm:text-7xl">{t.v ?? (failed ? "–" : "…")}</p>
             <p className="mt-1 text-sm font-bold">{t.k}</p>
           </div>
         ))}
       </div>
       <p className="mx-auto mt-8 max-w-6xl px-4 text-xs text-on-muted">
-        {d ? `Updated ${new Date(d.at).toLocaleTimeString()}` : "Loading…"} · Counted on the server from Nexconn tokens issued and calls accepted.
+        {d ? `Updated ${new Date(d.at).toLocaleTimeString()}` : failed ? "Couldn't load the numbers. Retrying every 10 seconds." : "Loading…"} · Counted on the server from Nexconn tokens issued and calls accepted.
       </p>
     </main>
   );

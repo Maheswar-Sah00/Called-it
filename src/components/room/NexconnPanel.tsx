@@ -35,7 +35,7 @@ export function NexconnPanel({
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="brut-sm fixed bottom-4 left-4 z-40 max-lg:bottom-[5.6rem] flex items-center gap-2 rounded-full bg-night px-4 py-2 text-xs font-bold text-white transition-transform hover:-translate-y-1"
+        className="brut-sm fixed bottom-4 left-4 z-40 max-lg:!hidden max-lg:bottom-[5.6rem] flex items-center gap-2 rounded-full bg-night px-4 py-2 text-xs font-bold text-white transition-transform hover:-translate-y-1"
       >
         <span className={`h-2.5 w-2.5 rounded-full ${live === "live" ? "bg-lime" : "bg-[#888]"}`} />
         <span className="hidden sm:inline">Nexconn inside</span>

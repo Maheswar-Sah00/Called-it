@@ -89,6 +89,23 @@ function toMsg(m: import("@nexconn/chat").Message): LiveMsg {
   return { id: m.messageId, type: m.messageType, from: m.senderUserId, at: m.sentTime || Date.now(), content: c, text };
 }
 
+/** Reject if a promise takes too long (a hung SDK call must not freeze the room). */
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${what} timed out`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 /** One connect at a time per user, shared by every caller (React may mount twice). */
 let connecting: { userId: string; p: Promise<void> } | null = null;
 function connectOnce(s: SDK, userId: string, token: string): Promise<void> {
@@ -97,7 +114,7 @@ function connectOnce(s: SDK, userId: string, token: string): Promise<void> {
   const p = (async () => {
     if (connectedAs) await s.NCEngine.disconnect();
     const t0 = performance.now();
-    const r = await s.NCEngine.connect({ token });
+    const r = await withTimeout(s.NCEngine.connect({ token }), 12_000, "connect");
     log("NCEngine.connect", r.isOk ? `as ${userId}` : `failed ${r.code}`, Math.round(performance.now() - t0));
     if (!r.isOk) throw new Error(`connect failed ${r.code}`);
     connectedAs = userId;
@@ -196,7 +213,7 @@ export async function joinLive(opts: {
 
   const ch = new s.OpenChannel(opts.channelId);
   const t1 = performance.now();
-  const er = await ch.enterChannel({ messageCount: 30 });
+  const er = await withTimeout(ch.enterChannel({ messageCount: 30 }), 12_000, "enter");
   log("OpenChannel.enterChannel", er.isOk ? `${opts.channelId}, ${er.data?.participantCount ?? "?"} here` : `failed ${er.code}`, Math.round(performance.now() - t1));
   if (!er.isOk) {
     emit({ kind: "status", status: "offline", detail: `enter ${er.code}` });

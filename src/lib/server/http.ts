@@ -21,3 +21,14 @@ export function limited(key: string, max: number, windowMs: number) {
   b.n++;
   return b.n > max;
 }
+
+/** Parse a JSON body into a plain object; anything else (null, array, number, bad JSON) becomes {}. */
+export async function readBody<T extends Record<string, unknown>>(req: Request): Promise<Partial<T>> {
+  const v = (await req.json().catch(() => null)) as unknown;
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Partial<T>) : {};
+}
+
+/** A plain short string from untrusted input, or "". */
+export function str(v: unknown, max: number): string {
+  return typeof v === "string" || typeof v === "number" ? String(v).slice(0, max) : "";
+}

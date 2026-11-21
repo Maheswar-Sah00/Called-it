@@ -130,9 +130,10 @@ export function StartRoom({
             </div>
           )}
 
-          {err && <p className="mt-3 rounded-xl border-2 border-ink bg-k-rose px-3 py-2 text-sm font-semibold">{err}</p>}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t-2 border-dashed border-ink/15 pt-4">
-            <p className="text-sm text-muted">
+          <div className="sticky -bottom-6 z-10 -mx-6 mt-5 border-t-2 border-dashed border-ink/15 bg-paper px-6 pb-6 pt-4">
+          {err && <p className="mb-3 rounded-xl border-2 border-ink bg-k-rose px-3 py-2 text-sm font-semibold">{err}</p>}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted max-sm:hidden">
               Hosting as <b className="text-ink">{info?.session?.name}</b>
               {match && (
                 <>
@@ -144,6 +145,7 @@ export function StartRoom({
             <button className="key text-base" onClick={create} disabled={busy || (!match && !name.trim())}>
               {busy ? "Opening…" : match ? `Open room: ${match.short}` : "Open my room"}
             </button>
+          </div>
           </div>
         </div>
       )}

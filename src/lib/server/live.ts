@@ -1,5 +1,7 @@
 import "server-only";
+import { after } from "next/server";
 import type { LiveMatch, Sport } from "@/lib/game";
+import { getJSON, setJSON } from "./store";
 
 /**
  * Live matches from ESPN's public scoreboard feed (no key). Cached in memory
@@ -64,10 +66,10 @@ function normalise(sport: Sport, league: string, e: EspnEvent): LiveMatch {
   };
 }
 
-async function fetchFeed(sport: Sport, q: string, label?: string): Promise<LiveMatch[]> {
+const STALE_OK = 10 * 60_000; // serve up to 10-minute-old data instantly while refreshing
+
+async function pull(sport: Sport, q: string, label?: string): Promise<LiveMatch[]> {
   const key = `${sport}|${q}`;
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL) return hit.data;
   const running = inflight.get(key);
   if (running) return running;
   const p = (async () => {
@@ -82,16 +84,47 @@ async function fetchFeed(sport: Sport, q: string, label?: string): Promise<LiveM
       for (const sp of d.sports ?? [])
         for (const lg of sp.leagues ?? [])
           for (const e of lg.events ?? []) out.push(normalise(sport, label ?? lg.shortName ?? lg.name ?? "", e));
-      cache.set(key, { at: Date.now(), data: out });
+      const entry = { at: Date.now(), data: out };
+      cache.set(key, entry);
+      void setJSON(`live:feed:${key}`, entry, 60 * 60).catch(() => null); // shared across server instances
       return out;
     } catch {
-      return hit?.data ?? [];
+      return cache.get(key)?.data ?? [];
     } finally {
       inflight.delete(key);
     }
   })();
   inflight.set(key, p);
   return p;
+}
+
+/**
+ * Stale-while-revalidate: memory → Redis (shared by every server instance) → ESPN.
+ * Anything up to 10 minutes old is served at once and refreshed in the background,
+ * so a visitor never waits on the feed after the very first fetch.
+ */
+async function fetchFeed(sport: Sport, q: string, label?: string): Promise<LiveMatch[]> {
+  const key = `${sport}|${q}`;
+  let hit = cache.get(key);
+  if (!hit) {
+    const shared = await getJSON<Cache>(`live:feed:${key}`).catch(() => null);
+    if (shared?.data) {
+      hit = shared;
+      cache.set(key, shared);
+    }
+  }
+  const age = hit ? Date.now() - hit.at : Infinity;
+  if (hit && age < TTL) return hit.data;
+  if (hit && age < STALE_OK) {
+    const refresh = pull(sport, q, label);
+    try {
+      after(() => refresh);
+    } catch {
+      /* outside a request: the promise still runs */
+    }
+    return hit.data;
+  }
+  return pull(sport, q, label);
 }
 
 const RANK = { live: 0, soon: 1, done: 2 } as const;

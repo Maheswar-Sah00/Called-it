@@ -111,23 +111,60 @@ export async function sadd(key: string, member: string): Promise<number> {
   return s.size - before;
 }
 
+/** Sorted-set helpers (channel registry). */
+export async function zadd(key: string, member: string, score: number) {
+  if (redis) return void (await redis.zadd(key, { score, member }));
+  const z = (memGet<Record<string, number>>(key) ?? {}) as Record<string, number>;
+  z[member] = score;
+  mem.kv.set(key, z);
+}
+
+/** Oldest first. */
+export async function zoldest(key: string, n: number): Promise<string[]> {
+  if (redis) return ((await redis.zrange(key, 0, n - 1)) as unknown[]).map(String);
+  const z = (memGet<Record<string, number>>(key) ?? {}) as Record<string, number>;
+  return Object.entries(z)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, n)
+    .map(([m]) => m);
+}
+
+export async function zrem(key: string, ...members: string[]) {
+  if (!members.length) return;
+  if (redis) return void (await redis.zrem(key, ...members));
+  const z = (memGet<Record<string, number>>(key) ?? {}) as Record<string, number>;
+  for (const m of members) delete z[m];
+  mem.kv.set(key, z);
+}
+
+export async function zcount(key: string): Promise<number> {
+  if (redis) return Number(await redis.zcard(key));
+  return Object.keys((memGet<Record<string, number>>(key) ?? {}) as Record<string, number>).length;
+}
+
 export async function scard(key: string): Promise<number> {
   if (redis) return Number(await redis.scard(key));
   return ((memGet<string[]>(key) ?? []) as string[]).length;
 }
 
 /** Short lease so that only one request advances a room at a time. */
-export async function lease(key: string, ms: number): Promise<boolean> {
-  if (redis) return (await redis.set(key, "1", { nx: true, px: ms })) === "OK";
-  if (memGet(key)) return false;
-  mem.kv.set(key, "1");
+/** Short lease so only one request advances a room at a time. Returns an owner token, or null. */
+export async function lease(key: string, ms: number): Promise<string | null> {
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  if (redis) return (await redis.set(key, token, { nx: true, px: ms })) === "OK" ? token : null;
+  if (memGet(key)) return null;
+  mem.kv.set(key, token);
   mem.exp.set(key, Date.now() + ms);
-  return true;
+  return token;
 }
 
-export async function release(key: string) {
-  if (redis) return void (await redis.del(key));
-  mem.kv.delete(key);
+const RELEASE_SCRIPT = `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end`;
+
+/** Release only if we still own it (a slow holder must not free someone else's lease). */
+export async function release(key: string, token: string | null) {
+  if (!token) return;
+  if (redis) return void (await redis.eval(RELEASE_SCRIPT, [key], [token]));
+  if (memGet(key) === token) mem.kv.delete(key);
 }
 
 /**
@@ -174,9 +211,12 @@ export async function callIfOpen(
 /** Replace the whole moment hash (host actions are serialised by the room lease). */
 export async function setMoment(momentKey: string, fields: Record<string, string>) {
   if (redis) {
-    await redis.del(momentKey);
-    await redis.hset(momentKey, fields);
-    await redis.expire(momentKey, 1209600);
+    // one transaction: a call can never land between the delete and the write
+    const tx = redis.multi();
+    tx.del(momentKey);
+    tx.hset(momentKey, fields);
+    tx.expire(momentKey, 1209600);
+    await tx.exec();
     return;
   }
   mem.kv.set(momentKey, { ...fields });

@@ -1,6 +1,6 @@
 import { appKey, issueToken } from "@/lib/server/nexconn";
 import { cleanName, newUserId, readSession, writeSession } from "@/lib/server/session";
-import { fail, limited, ok } from "@/lib/server/http";
+import { fail, limited, ok, readBody, str } from "@/lib/server/http";
 import { sadd } from "@/lib/server/store";
 import { AVATARS } from "@/lib/game";
 
@@ -18,7 +18,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "local";
   if (limited(`session:${ip}`, 20, 60_000)) return fail(429, "Too many joins, try again in a minute");
-  const body = (await req.json().catch(() => ({}))) as { name?: string; demo?: boolean; avatar?: string };
+  const body = (await readBody(req)) as { name?: string; demo?: boolean; avatar?: string };
   const avatar = (AVATARS as readonly string[]).includes(body.avatar ?? "") ? body.avatar : "student";
   const name = cleanName(body.name);
   if (!name) return fail(400, "Pick a nickname");

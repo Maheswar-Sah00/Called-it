@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { SPORT_ART, SPORT_LABEL, type LiveMatch, type Sport } from "@/lib/game";
-import { Art, Brand, Faq, Wordmark } from "@/components/ui";
+import { Art, Brand, Faq, Pitch, Wordmark } from "@/components/ui";
 import { StartRoom } from "@/components/StartRoom";
 import { HeroScoreboard } from "@/components/HeroScoreboard";
 import { ThemeToggle } from "@/components/Theme";
-import { LiveBrowser, MatchRow, useLive } from "@/components/LiveMatches";
+import { LiveBrowser, MatchRow, MatchTicket, ScoreTicker, useLive } from "@/components/LiveMatches";
 
 const FAQS = [
   { q: "Is this betting?", a: "No. Called It is points only, never money. No stakes, no wallets, no odds. Betting talk, links and phone numbers are blocked before they reach the room." },
@@ -57,8 +57,8 @@ export default function Home() {
 
   return (
     <main className="overflow-x-hidden">
-      {/* ================= HERO ================= */}
-      <section className="flood relative">
+      {/* ================= HERO: centred sticker wordmark ================= */}
+      <section className="flood relative pb-28 sm:pb-44">
         <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pt-5">
           <Brand />
           <div className="hidden items-center gap-7 text-sm font-bold text-on-muted md:flex">
@@ -72,128 +72,101 @@ export default function Home() {
               Built on Nexconn
             </a>
           </div>
-          <div className="flex items-center gap-2.5">
-            <ThemeToggle />
-            <button className="key key-sm hidden sm:inline-flex" onClick={() => start()}>
-              Start a room
-            </button>
-          </div>
+          <ThemeToggle />
         </nav>
 
-        <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-4 pb-24 pt-14 lg:grid-cols-[1.1fr_1fr] lg:pb-28 lg:pt-20">
-          <div>
-            <a
-              href="#nexconn"
-              className="inline-flex items-center gap-2 rounded-full border border-line bg-stage-2/70 py-1 pl-1 pr-3 text-xs font-bold text-on-muted backdrop-blur transition hover:text-on"
-            >
-              <span className="rounded-full bg-orange px-2 py-0.5 text-[11px] font-extrabold text-ink">NEW</span>
-              Built on Nexconn for the Build Challenge 2026
-            </a>
-            <h1 className="font-display mt-6 text-[3.1rem] font-extrabold leading-[0.98] tracking-[-0.035em] sm:text-[4.6rem]">
-              Watch apart.
-              <br />
-              <span className="text-orange">Call it together.</span>
-            </h1>
-            <p className="mt-6 max-w-md text-lg leading-relaxed text-on-muted">
-              Pick the match you&apos;re watching, bring your friends, and call the next ball, penalty or point. The server locks it the
-              moment it happens.
-            </p>
-            <div className="mt-9 flex flex-wrap items-center gap-4">
-              <button className="key text-lg" onClick={() => start()}>
-                Start a room
-              </button>
-              <a href="/try" className="group inline-flex items-center gap-2 px-2 py-3 text-base font-bold text-on transition hover:text-orange">
-                <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-current transition-transform group-hover:scale-110">
-                  <svg viewBox="0 0 12 12" className="ml-0.5 h-3 w-3" aria-hidden>
-                    <path d="M2 1l9 5-9 5z" fill="currentColor" />
-                  </svg>
-                </span>
-                60-second demo
-              </a>
-            </div>
-            <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-on-muted">
-              <span className="flex items-center gap-2">
-                <span className="live-dot" />
-                <b className="text-on">{featured ? liveNow.length : "…"}</b> matches live now
-              </span>
-              <span className="hidden h-4 w-px bg-line sm:block" />
-              <span>No sign-up</span>
-              <span className="hidden h-4 w-px bg-line sm:block" />
-              <span>Points, never money</span>
-            </div>
-          </div>
+        {/* floating stickers */}
+        <Art src="b5/bolt" className="floaty absolute left-[4%] top-24 w-16 sm:w-24" style={{ ["--r" as string]: "-14deg" }} />
+        <Art src="b5/invader" className="floaty absolute right-[6%] top-28 w-14 sm:w-20 [animation-delay:1.2s]" />
+        <Art src="b2/foam-finger" className="floaty absolute left-[7%] top-[26rem] hidden w-28 md:block [animation-delay:.6s]" style={{ ["--r" as string]: "12deg" }} />
+        <Art src="b2/stopwatch" className="floaty absolute right-[8%] top-[24rem] hidden w-24 md:block [animation-delay:2s]" style={{ ["--r" as string]: "10deg" }} />
+        <Art src="b5/sparkle" className="twinkle absolute left-[24%] top-28 w-6" />
+        <Art src="b5/sparkle" className="twinkle absolute right-[26%] top-20 w-5 [animation-delay:.9s]" />
 
-          {/* live right now */}
-          <div className="relative">
-            <Art src="b3/pumped" className="absolute -right-3 -top-12 z-10 hidden w-24 rotate-6 sm:block" />
-            <div className="brut-lg rounded-[26px] bg-stage-2 p-4 sm:p-5">
-              <div className="flex items-center justify-between px-1">
-                <p className="font-display text-lg font-extrabold">Live right now</p>
-                <a href="#live" className="text-xs font-bold text-on-muted transition hover:text-orange">
-                  See all →
-                </a>
-              </div>
-              <div className="mt-3 flex flex-col gap-2.5">
-                {featured === null &&
-                  Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
-                {(liveNow.length ? liveNow : featured ?? []).slice(0, 3).map((m) => (
-                  <MatchRow key={m.sport + m.id} m={m} onPick={(x) => start(x.sport, x)} />
-                ))}
-              </div>
-              <p className="mt-3 px-1 text-[11px] text-on-muted">Scores update every 30 seconds. Tap a match to open a room for it.</p>
-            </div>
+        <div className="relative z-10 mx-auto max-w-3xl px-4 pt-8 text-center sm:pt-14">
+          <a
+            href="#nexconn"
+            className="inline-flex items-center gap-2 rounded-full border-2 border-ink bg-paper py-1 pl-1 pr-3 text-xs font-bold text-ink shadow-[0_3px_0_var(--shadow)] transition hover:-translate-y-0.5"
+          >
+            <span className="rounded-full bg-orange px-2 py-0.5 text-[11px] font-extrabold">NEXCONN</span>
+            Built for the Build Challenge 2026
+          </a>
+          <div className="relative mx-auto mt-8 w-fit">
+            <Art src="b5/starburst" className="absolute -left-10 -top-8 w-20 -rotate-12 sm:-left-16 sm:w-28" />
+            <Art src="b1/cricket" className="absolute -right-8 -top-10 w-16 rotate-12 sm:-right-14 sm:w-24" />
+            <Wordmark size="text-[3.7rem] sm:text-[8.2rem]" className="relative" />
           </div>
+          <p className="mt-5 text-sm font-bold text-on-muted">Points only · never money</p>
+          <h1 className="font-display mt-6 text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">
+            Watch apart.
+            <br />
+            <span className="text-orange">Call it together.</span>
+          </h1>
+          <p className="mx-auto mt-4 max-w-xl text-base text-on-muted sm:text-lg">
+            Pick the match you&apos;re watching, bring your friends, and call the next ball, penalty or point. The server locks it the
+            moment it happens.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <button className="key text-lg" onClick={() => start()}>
+              Start a room
+            </button>
+            <a href="/try" className="key key-paper text-lg">
+              60-second demo
+            </a>
+          </div>
+          <p className="mt-6 flex items-center justify-center gap-2 text-sm text-on-muted">
+            <span className="live-dot" />
+            <b className="text-on">{featured ? liveNow.length : "…"}</b> matches live right now
+          </p>
         </div>
+        <Pitch className="absolute inset-x-0 bottom-0 h-28 sm:h-36" />
+        <Art src="b3/pumped" className="floaty absolute bottom-4 right-[10%] z-10 w-20 sm:w-28" />
+        <Art src="b4/football" className="absolute bottom-3 left-[9%] z-10 hidden w-24 sm:block" />
       </section>
 
-      {/* ================= LIVE NOW ================= */}
-      <section id="live" className="mx-auto max-w-6xl scroll-mt-6 px-4 py-24">
+      <ScoreTicker matches={featured} />
+
+      {/* ================= PICK YOUR MATCH: tilted tickets ================= */}
+      <section id="live" className="mx-auto max-w-6xl scroll-mt-6 px-4 py-20">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange">Live now</p>
-            <h2 className="font-display mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Pick your match</h2>
-          </div>
-          <p className="max-w-sm text-on-muted">Every match on air right now, from Test cricket to the Premier League. Search for yours and open a room.</p>
+          <h2 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">Pick your match</h2>
+          <p className="max-w-sm text-on-muted">Real matches on air right now. Tap yours and open a room for it.</p>
         </div>
-        <div className="mt-8">
-          <LiveBrowser onPick={(m) => start(m.sport, m)} limit={9} />
-        </div>
-        <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-dashed border-line p-4">
-          <p className="mr-2 text-sm font-bold">Kabaddi, badminton, esports or your gully final?</p>
-          {(["kabaddi", "badminton", "esports", "other"] as Sport[]).map((s) => (
-            <button key={s} onClick={() => start(s)} className="chip">
-              <Art src={SPORT_ART[s].bolo} className="h-5 w-5" /> {SPORT_LABEL[s]}
-            </button>
+        <div className="mt-6 flex flex-col gap-3 sm:hidden">
+          {featured === null && Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
+          {(liveNow.length ? liveNow : featured ?? []).slice(0, 4).map((m) => (
+            <MatchRow key={m.sport + m.id} m={m} onPick={(x) => start(x.sport, x)} />
           ))}
         </div>
-      </section>
-
-      {/* ================= HOW IT WORKS ================= */}
-      <section id="how" className="scroll-mt-6 bg-stage-2 py-24">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 lg:grid-cols-[1fr_1.05fr]">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange">How it works</p>
-            <h2 className="font-display mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">One over, start to finish</h2>
-            <ol className="mt-8 flex flex-col gap-5">
-              {OVER.map((b, i) => (
-                <li key={b.t} className="group flex gap-4">
-                  <span
-                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-ink font-display text-base font-extrabold shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-0.5 ${
-                      b.hot ? "bg-red text-white" : b.win ? "bg-lime text-ink" : "bg-paper text-ink"
-                    }`}
-                  >
-                    {b.art ? <Art src={b.art} className="h-7 w-7" /> : i + 1}
-                  </span>
-                  <div>
-                    <p className="font-display text-lg font-extrabold">{b.t}</p>
-                    <p className="text-sm text-on-muted">{b.d}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <HeroScoreboard />
+        <div className="mt-10 hidden gap-x-4 gap-y-6 sm:grid sm:grid-cols-3 lg:grid-cols-5">
+          {featured === null &&
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="brut h-[17rem] animate-pulse rounded-[22px] bg-paper/70" style={{ transform: `rotate(${[-2, 1.5, -1, 2, -1.5][i]}deg)` }} />
+            ))}
+          {(liveNow.length ? liveNow : featured ?? []).slice(0, 5).map((m, i) => (
+            <MatchTicket key={m.sport + m.id} m={m} i={i} onPick={(x) => start(x.sport, x)} />
+          ))}
         </div>
+
+        <details className="group mt-12 rounded-[22px] border-2 border-ink bg-stage-2 shadow-[0_5px_0_var(--shadow)]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+            <span className="font-display text-lg font-extrabold">
+              Can&apos;t see yours? Search every match
+            </span>
+            <span className="grid h-8 w-8 place-items-center rounded-full border-2 border-ink bg-orange font-bold text-ink transition-transform group-open:rotate-45">+</span>
+          </summary>
+          <div className="border-t-2 border-dashed border-line px-5 pb-5 pt-4">
+            <LiveBrowser onPick={(m) => start(m.sport, m)} limit={12} />
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+              <span className="mr-1 text-sm font-bold">No feed for your sport?</span>
+              {(["kabaddi", "badminton", "esports", "other"] as Sport[]).map((s) => (
+                <button key={s} onClick={() => start(s)} className="chip">
+                  <Art src={SPORT_ART[s].bolo} className="h-5 w-5" /> {SPORT_LABEL[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </details>
       </section>
 
       {/* ================= HOUSE RULES: tactics board ================= */}
@@ -243,6 +216,71 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ================= HOW IT WORKS: steps row + the lock card ================= */}
+      <section id="how" className="mx-auto max-w-6xl scroll-mt-6 px-4 py-24">
+        <h2 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">How does it work?</h2>
+        <div className="mt-10 grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-6">
+          {OVER.map((b, i) => (
+            <div key={b.t} className="group">
+              <span
+                className={`grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink font-display text-lg font-extrabold shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-1 group-hover:rotate-12 ${
+                  b.hot ? "bg-red text-white" : b.win ? "bg-lime text-ink" : "bg-orange text-ink"
+                }`}
+              >
+                {b.art ? <Art src={b.art} className="h-8 w-8" /> : i + 1}
+              </span>
+              <p className="font-display mt-4 text-lg font-extrabold">{b.t}</p>
+              <p className="mt-1 text-sm text-on-muted">{b.d}</p>
+            </div>
+          ))}
+        </div>
+        <div className="brut-lg mt-14 grid items-center gap-8 rounded-[28px] bg-paper p-6 text-ink sm:p-8 lg:grid-cols-[1fr_1.1fr]">
+          <div>
+            <span className="rounded-md border-2 border-ink bg-orange px-2 py-0.5 text-[11px] font-extrabold">THE BIT THAT MATTERS</span>
+            <h3 className="font-display mt-3 text-3xl font-extrabold">The lock is the game</h3>
+            <p className="mt-2 font-semibold">Every call is stamped by the server when it lands, not by your phone.</p>
+            <p className="mt-2 text-sm text-muted">
+              On a delayed stream? Nobody can sneak a call in after it happens. A late tap gets “Locked” and the exact delay, and reviews hold
+              the points until the decision is in.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold">
+              {["Host taps Go", "Calls open", "It happens", "LOCKED", "Result settles"].map((x, i, a) => (
+                <span key={x} className="flex items-center gap-2">
+                  <span className={`rounded-full border-2 border-ink px-3 py-1.5 ${x === "LOCKED" ? "bg-red text-white" : i === a.length - 1 ? "bg-lime" : "bg-k-butter"}`}>{x}</span>
+                  {i < a.length - 1 && <span className="max-sm:hidden">→</span>}
+                </span>
+              ))}
+            </div>
+          </div>
+          <HeroScoreboard />
+        </div>
+      </section>
+
+      {/* ================= WHAT'S IN IT FOR YOU: tilted sticker cards ================= */}
+      <section className="bg-night py-24 text-paper max-md:hidden">
+        <div className="mx-auto max-w-6xl px-4">
+          <h2 className="font-display text-4xl font-extrabold tracking-tight text-orange sm:text-5xl">What&apos;s in it for you?</h2>
+          <div className="mt-12 grid grid-cols-2 gap-5 md:grid-cols-5">
+            {[
+              { art: "b2/crown", t: "Bragging rights", d: "A live table everyone sees at once.", c: "bg-[#ffd23f]", r: "-rotate-3" },
+              { art: "b2/flame", t: "Streak bonus", d: "Two right in a row: +5 on every call after.", c: "bg-[#ff7a1a]", r: "rotate-2" },
+              { art: "b2/megaphone", t: "Real banter", d: "Chat, stickers and voice huddles with the room.", c: "bg-[#ffc6d6]", r: "-rotate-2" },
+              { art: "b2/stopwatch", t: "Spoiler shield", d: "Results wait for your slower stream.", c: "bg-[#cdeeb4]", r: "rotate-3" },
+              { art: "b2/lock", t: "Safe rooms", d: "No betting spam, links or forged results.", c: "bg-[#ffd2ad]", r: "-rotate-1" },
+            ].map((p) => (
+              <div
+                key={p.t}
+                className={`rounded-2xl border-[3px] border-ink ${p.c} p-4 text-[#140b08] shadow-[6px_6px_0_#000] transition-transform duration-300 hover:-translate-y-2 hover:rotate-0 ${p.r}`}
+              >
+                <Art src={p.art} className="h-20 w-20" />
+                <p className="font-display mt-2 text-xl font-extrabold leading-tight">{p.t}</p>
+                <p className="mt-1.5 text-sm opacity-80">{p.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ================= BUILT ON NEXCONN: the team sheet ================= */}
       <section className="mx-auto max-w-6xl px-4 pt-24" id="nexconn">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -261,7 +299,7 @@ export default function Home() {
         </div>
         <div className="mt-10 grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
           {/* formation */}
-          <div className="turf relative aspect-[4/5] overflow-hidden rounded-[24px] border-[3px] border-ink shadow-[8px_8px_0_var(--shadow)]">
+          <div className="turf relative aspect-[4/5] overflow-hidden rounded-[24px] border-[3px] border-ink shadow-[8px_8px_0_var(--shadow)] max-lg:hidden">
             <svg viewBox="0 0 100 125" className="absolute inset-0 h-full w-full" aria-hidden>
               <rect x="5" y="5" width="90" height="115" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth=".8" />
               <line x1="5" y1="62.5" x2="95" y2="62.5" stroke="#fff" strokeOpacity=".55" strokeWidth=".8" />
@@ -325,24 +363,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= ASK THE UMPIRE ================= */}
+      {/* ================= FAQ: two columns of outlined cards ================= */}
       <section className="mx-auto max-w-6xl px-4 py-24">
-        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.6fr]">
-          <div className="lg:sticky lg:top-10 lg:self-start">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-orange">FAQ</p>
-            <h2 className="font-display mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Questions, answered</h2>
-            <Art src="c2/football-referee" className="mt-6 w-40" />
+        <h2 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">FAQs</h2>
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-4">
+            {FAQS.filter((_, i) => i % 2 === 0).map((f) => (
+              <Faq key={f.q} {...f} />
+            ))}
           </div>
-          <div className="paper brut-lg overflow-hidden rounded-[24px] px-3 py-2 sm:px-6">
-            {FAQS.map((f, i) => (
-              <Faq key={f.q} n={i + 1} {...f} />
+          <div className="flex flex-col gap-4">
+            {FAQS.filter((_, i) => i % 2 === 1).map((f) => (
+              <Faq key={f.q} {...f} />
             ))}
           </div>
         </div>
       </section>
 
       {/* ================= FOOTER ================= */}
-      <footer className="flood relative px-4 pb-14 pt-24 text-center">
+      <footer className="flood relative overflow-hidden px-4 pb-40 pt-20 text-center">
         <div className="flex justify-center">
           <Wordmark size="text-6xl sm:text-8xl" stacked={false} />
         </div>
@@ -350,18 +389,16 @@ export default function Home() {
         <button className="key mt-8 text-lg" onClick={() => start()}>
           Start a room
         </button>
-        <div className="mx-auto mt-14 flex max-w-6xl flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-xs text-on-muted">
-          <span>Built on Nexconn Chat for the Nexconn Build Challenge 2026 · Points only, never money</span>
-          <span className="flex items-center gap-4">
-            <a className="hover:text-orange" href="/impact">
-              Live impact
-            </a>
-            <a className="hover:text-orange" href="/try">
-              Demo
-            </a>
-            <ThemeToggle />
-          </span>
-        </div>
+        <p className="relative z-10 mt-10 text-xs text-on-muted">
+          Built on Nexconn Chat for the Nexconn Build Challenge 2026 ·{" "}
+          <a className="underline hover:text-orange" href="/impact">
+            Live impact
+          </a>{" "}
+          · Points only, never money
+        </p>
+        <Pitch className="absolute inset-x-0 bottom-0 h-28" />
+        <Art src="b4/esports" className="absolute bottom-3 left-[10%] z-10 w-20" />
+        <Art src="b4/racing" className="absolute bottom-3 right-[10%] z-10 w-20" />
       </footer>
 
       <StartRoom open={open} onClose={() => setOpen(false)} sport={sport} match={match} />

@@ -40,10 +40,10 @@ export default function Try() {
         <Brand />
         <ThemeToggle />
       </div>
-      <div className="relative z-10 mx-auto grid max-w-5xl items-center gap-10 px-4 pb-40 pt-10 md:grid-cols-2">
+      <div className="relative z-10 mx-auto grid max-w-5xl items-center gap-8 px-4 pb-40 pt-6 md:grid-cols-2 md:gap-10 md:pt-10">
         <div>
           <p className="font-led text-2xl text-orange">REPLAY · T20 WORLD CUP FINAL 2024</p>
-          <Wordmark size="text-7xl" className="mt-2" />
+          <Wordmark size="text-5xl sm:text-7xl" className="mt-2" />
           <h1 className="font-display mt-6 text-3xl font-extrabold ">The 60-second demo</h1>
           <p className="mt-3 text-on-muted">
             Replay the last five overs of the <b>2024 T20 World Cup final</b>, ball by ball, from real Cricsheet data. South Africa
@@ -61,7 +61,7 @@ export default function Try() {
             ))}
           </ul>
         </div>
-        <div className="brut-lg rounded-3xl bg-paper p-6 text-ink">
+        <div className="brut-lg rounded-3xl bg-paper p-6 text-ink max-md:order-first">
           {info === null || busy || info.session ? (
             <div className="grid place-items-center py-10 text-center">
               <Art src="b4/cricket" className="floaty w-40" />

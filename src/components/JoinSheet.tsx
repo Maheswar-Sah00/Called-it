@@ -31,13 +31,13 @@ export function JoinSheet({
       <div className="flex items-center gap-3">
         <Art src="b3/wave" className="h-16 w-16" />
         <div>
-          <h2 className="font-display text-2xl font-extrabold">{title}</h2>
+          <h2 className="font-display pr-10 text-2xl font-extrabold leading-tight">{title}</h2>
           <p className="text-sm text-muted">A nickname is all we need. No sign-up.</p>
         </div>
       </div>
       <label className="mt-5 block text-xs font-bold uppercase tracking-wider">Nickname</label>
       <input
-        autoFocus
+        autoFocus={typeof window !== "undefined" && window.matchMedia?.("(pointer: fine)").matches}
         className="input mt-1.5"
         placeholder="e.g. Ashik"
         maxLength={24}
@@ -45,13 +45,13 @@ export function JoinSheet({
         onChange={(e) => setName(e.target.value)}
       />
       <label className="mt-5 block text-xs font-bold uppercase tracking-wider">Pick your face</label>
-      <div className="mt-2 grid grid-cols-6 gap-2">
+      <div className="mt-2 grid grid-cols-4 gap-2 min-[400px]:grid-cols-6">
         {AVATARS.map((a) => (
           <button
             type="button"
             key={a}
             onClick={() => setAvatar(a)}
-            className={`rounded-full transition-transform hover:-translate-y-1 hover:scale-110 ${avatar === a ? "scale-110" : "opacity-80"}`}
+            className={`grid aspect-square place-items-center rounded-full bg-k-sand transition-transform hover:-translate-y-1 hover:scale-110 ${avatar === a ? "scale-110" : "opacity-80"}`}
             aria-label={a}
             aria-pressed={avatar === a}
           >

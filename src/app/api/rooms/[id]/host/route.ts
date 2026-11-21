@@ -1,7 +1,7 @@
 import { getRoom, lockMoment, markPending, openMoment, presetsFor, settle, withHostLease } from "@/lib/server/rooms";
 import { muteInRoom, sendToRoom } from "@/lib/server/nexconn";
 import { readSession } from "@/lib/server/session";
-import { fail, limited, ok } from "@/lib/server/http";
+import { fail, limited, ok, readBody, str } from "@/lib/server/http";
 import type { Option } from "@/lib/game";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (room.hostId !== s.userId) return fail(403, "Only the host can do that");
   if (room.mode === "replay") return fail(400, "Replay rooms run themselves");
   if (limited(`host:${s.userId}`, 40, 10_000)) return fail(429, "Slow down");
-  const b = (await req.json().catch(() => ({}))) as Body;
+  const b = (await readBody(req)) as Body;
   const scoreline = b.scoreline?.toString().slice(0, 60) || undefined;
 
   const r: Out | null = await withHostLease<Out>(id, async () => {
@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           options = preset.options;
         } else {
           q = (b.q ?? "").toString().trim().slice(0, 80);
-          const labels = (b.labels ?? []).map((l) => String(l).trim().slice(0, 24)).filter(Boolean).slice(0, 4);
+          const labels = (Array.isArray(b.labels) ? b.labels : []).map((l) => String(l).trim().slice(0, 24)).filter(Boolean).slice(0, 4);
           if (!q || labels.length < 2) return { error: "Write a question and at least two answers" };
           options = labels.map((label, i) => ({ id: `o${i}`, label, points: 10 }));
         }

@@ -156,6 +156,7 @@ body {
   color: var(--ink);
 }
 
+@layer components {
 /* ---------- type ---------- */
 .font-display {
   font-family: var(--font-display), system-ui, sans-serif;
@@ -424,9 +425,6 @@ body {
   transform: rotate(-2deg);
   display: inline-block;
 }
-:root[data-theme="day"] .wm-small {
-  color: var(--orange);
-}
 
 /* LED-style block wordmark kept for scoreboards */
 .wordmark {
@@ -461,6 +459,13 @@ body {
   to {
     transform: translateX(-50%);
   }
+}
+
+
+}
+
+:root[data-theme="day"] .wm-small {
+  color: var(--orange);
 }
 
 /* ---------- motion ---------- */
@@ -634,3 +639,16 @@ body {
 
 /* small brand mark reads better as solid ink on the day sky */
 
+
+/* live score changed: a soft amber flash, no movement */
+@keyframes score-flash {
+  0% {
+    background-color: rgba(255, 210, 63, 0.28);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.score-flash {
+  animation: score-flash 1.2s ease-out both;
+}

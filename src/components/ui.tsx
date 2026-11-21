@@ -155,22 +155,22 @@ export function Modal({ open, onClose, children, wide = false }: { open: boolean
   );
 }
 
-export function Faq({ q, a, n }: { q: string; a: string; n: number }) {
+/** FAQ as an outlined card (Off Campus style), opens in place. */
+export function Faq({ q, a }: { q: string; a: string; n?: number }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`border-b-2 border-dashed border-ink/25 transition-colors ${open ? "bg-k-butter/60" : "hover:bg-k-butter/30"}`}>
-      <button className="flex w-full items-center gap-4 px-3 py-4 text-left" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="font-led w-8 shrink-0 text-2xl text-orange-d">{String(n).padStart(2, "0")}</span>
-        <span className="flex-1 font-display text-lg font-bold">{q}</span>
+    <div className={`brut-sm rounded-2xl text-ink transition-colors ${open ? "bg-k-butter" : "bg-paper hover:bg-k-butter/60"}`}>
+      <button className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="font-display text-[15px] font-bold">{q}</span>
         <span
-          className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border-2 border-ink text-lg font-bold shadow-[0_3px_0_var(--shadow)] transition-all ${open ? "rotate-45 bg-orange" : "bg-paper"}`}
+          className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-ink text-base font-bold transition-transform ${open ? "rotate-45 bg-orange" : "bg-paper"}`}
         >
           +
         </span>
       </button>
       <div className={`grid transition-all duration-300 ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
         <div className="overflow-hidden">
-          <p className="pb-5 pl-15 pr-12 text-[15px] leading-relaxed text-muted">{a}</p>
+          <p className="px-5 pb-5 text-[15px] leading-relaxed text-muted">{a}</p>
         </div>
       </div>
     </div>

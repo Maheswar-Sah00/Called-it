@@ -61,6 +61,8 @@ export function Room({ id }: { id: string }) {
   const [myCalls, setMyCalls] = useState<Record<string, string>>({});
   const [results, setResults] = useState<ResultCard[]>([]);
   const [stats, setStats] = useState({ cards: 0, chats: 0, forged: 0, blocked: 0 });
+  const [retry, setRetry] = useState(0);
+  const keysRef = useRef<HTMLDivElement | null>(null);
   /** live score pushed by Nexconn channel metadata (beats the polled copy) */
   const [pushed, setPushed] = useState<{ s: string; d: string; t: [string, string, string][]; at: number } | null>(null);
   const offset = useRef(0);
@@ -212,6 +214,7 @@ export function Room({ id }: { id: string }) {
     if (!me || !info?.token || !info.appKey || !st?.room.channelId) return;
     let cancelled = false;
     let live: Live | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     (async () => {
       await api(`/api/rooms/${id}/join`, {});
       fetchState();
@@ -222,15 +225,27 @@ export function Room({ id }: { id: string }) {
       } catch (err) {
         setLiveStatus("offline");
         log("error", String(err));
+        // retry with backoff: 2s, 4s, 8s … up to 20s
+        if (!cancelled) retryTimer = setTimeout(() => setRetry((n) => n + 1), Math.min(20_000, 2000 * 2 ** Math.min(retry, 4)));
       }
     })();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
       liveRef.current = null;
       void live?.leave();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me?.userId, info?.token, st?.room.channelId]);
+  }, [me?.userId, info?.token, st?.room.channelId, retry]);
+
+  // phones: when a new moment opens, bring the answer keys into view
+  const openMid = st?.moment?.state === "open" ? st.moment.mid : null;
+  useEffect(() => {
+    if (!openMid || typeof window === "undefined" || window.innerWidth >= 1024) return;
+    setTab("play");
+    const t = setTimeout(() => keysRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
+    return () => clearTimeout(t);
+  }, [openMid]);
 
   // ---------- derived ----------
   const shownResult = useMemo(() => {
@@ -290,14 +305,15 @@ export function Room({ id }: { id: string }) {
   // ---------- actions ----------
   async function call(option: string) {
     if (!moment || !me) return;
-    if (phase !== "open" || clientLocked) {
+    if (phase !== "open") {
       setLate("Locked");
       setTimeout(() => setLate(null), 1200);
       return;
     }
+    // if our countdown already hit zero we still ask: the server's clock decides and says how late we were
     const prev = myPick;
     setMyCalls((m) => ({ ...m, [moment.mid]: option }));
-    const r = await api<{ status: string; tally?: TallyCard; at?: number; lockAt?: number }>(`/api/rooms/${id}/call`, { mid: moment.mid, option });
+    const r = await api<{ status: string; tally?: TallyCard; at?: number; lockAt?: number }>(`/api/rooms/${id}/call`, { mid: moment.mid, option, tapAt: Date.now() + offset.current });
     if (!r.ok) {
       setMyCalls((m) => {
         const n = { ...m };
@@ -352,8 +368,12 @@ export function Room({ id }: { id: string }) {
         /* fall through to copy */
       }
     }
-    await navigator.clipboard.writeText(url);
-    toast.show("Room link copied", "mint");
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.show("Room link copied", "mint");
+    } catch {
+      toast.show(url);
+    }
   }
 
   // ---------- render ----------
@@ -421,12 +441,39 @@ export function Room({ id }: { id: string }) {
 
   return (
     <main className="min-h-screen pb-28 lg:pb-16">
-      {/* ===== top bar ===== */}
-      <header className="flood">
+      {/* ===== phones: compact sticky score bar ===== */}
+      <div className="led sticky top-0 z-30 !rounded-none !border-x-0 !border-t-0 px-3 pb-2 pt-2.5 text-paper !shadow-[0_3px_0_var(--shadow)] sm:hidden">
+        <div className="flex items-center gap-2">
+          <Link href="/" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border-2 border-ink bg-orange" aria-label="Home">
+            <Art src={SPORT_ART[sport].bolo} className="h-7 w-7" />
+          </Link>
+          <p className="font-arcade min-w-0 flex-1 truncate text-sm">{room?.name ?? "Loading…"}</p>
+          <button
+            onClick={() => liveStatus === "offline" && setRetry((n) => n + 1)}
+            className="flex items-center gap-1.5 rounded-md border border-white/20 px-1.5 py-0.5"
+          >
+            {liveStatus === "live" ? <span className="live-dot !h-2 !w-2" /> : <span className="h-2 w-2 rounded-full bg-white/30" />}
+            <span className="font-led text-base leading-none">{liveStatus === "live" ? `LIVE ${people ?? ""}` : liveStatus === "connecting" ? "TUNING IN" : "TAP TO RETRY"}</span>
+          </button>
+          <span className="font-led led-text text-2xl leading-none">{myPoints}</span>
+          <span className="font-led text-xs leading-none text-paper/50">PTS</span>
+          <button className="key key-sm !px-2.5 !py-1 text-xs" onClick={invite}>
+            Invite
+          </button>
+        </div>
+        <p className="font-led led-text mt-1.5 truncate text-lg leading-none">
+          {liveView && liveView.teams.length === 2
+            ? `${liveView.teams[0].abbr} ${liveView.teams[0].score || "-"} · ${liveView.teams[1].abbr} ${liveView.teams[1].score || "-"}`
+            : st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "")}
+        </p>
+      </div>
+
+      {/* ===== top bar (tablet/desktop) ===== */}
+      <header className="flood max-sm:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 pt-4">
           <Brand />
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block"><ThemeToggle /></div>
+            <ThemeToggle />
             <button className="key key-sm" onClick={invite}>
               Invite
             </button>
@@ -442,7 +489,7 @@ export function Room({ id }: { id: string }) {
               </span>
               <div className="min-w-0">
                 <p className="font-led text-lg text-paper/60">
-                  {SPORT_LABEL[sport].toUpperCase()} · {room?.mode === "replay" ? "REPLAY" : "HOST MODE"}
+                  {room ? `${SPORT_LABEL[sport].toUpperCase()} · ${room.mode === "replay" ? "REPLAY" : "HOST MODE"}` : "LOADING ROOM…"}
                   {room?.demo && " · WITH DEMO BOTS"}
                 </p>
                 <p className="font-arcade truncate text-xl sm:text-2xl">{room?.name ?? "Loading…"}</p>
@@ -450,27 +497,28 @@ export function Room({ id }: { id: string }) {
             </div>
             <div className="min-w-0 text-left sm:text-center">
               {liveView && liveView.teams.length === 2 ? (
-                <>
-                  <div key={pushed?.at ?? 0} className={`flex flex-wrap items-center gap-x-4 gap-y-1 sm:justify-center ${pushed ? "pop-in" : ""}`} style={{ animationDuration: "0.35s" }}>
+                <div className="mx-auto w-full max-w-md">
+                  {/* two-row scoreboard: flag · team · score (scores right-aligned) */}
+                  <div key={pushed?.at ?? 0} className="score-flash overflow-hidden rounded-xl border-2 border-white/10">
                     {liveView.teams.map((t, i) => (
-                      <span key={t.abbr + i} className="flex items-center gap-2">
-                        {i === 1 && <span className="font-led text-2xl text-paper/40">v</span>}
-                        {t.logo && (
+                      <div key={t.abbr + i} className={`flex items-center gap-3 px-3 py-1.5 ${i === 0 ? "border-b border-white/10" : ""}`}>
+                        {t.logo ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={t.logo} alt="" className="h-7 w-7 object-contain" />
+                          <img src={t.logo} alt="" className="h-6 w-8 shrink-0 object-contain" />
+                        ) : (
+                          <span className="h-6 w-8 shrink-0" />
                         )}
-                        <span className="font-led led-text text-[1.6rem] leading-none sm:text-3xl">
-                          {t.abbr} {t.score}
-                        </span>
-                      </span>
+                        <span className="font-led w-16 shrink-0 text-left text-2xl leading-none text-paper/85 sm:text-[1.7rem]">{t.abbr}</span>
+                        <span className="font-led led-text min-w-0 flex-1 truncate text-right text-2xl leading-none sm:text-[1.7rem]">{t.score || "–"}</span>
+                      </div>
                     ))}
                   </div>
-                  <p className="font-led mt-1 truncate text-lg text-paper/60">
-                    {liveView.status === "live" ? "● LIVE · " : ""}
-                    {liveView.detail.toUpperCase()}
-                    {pushed && <span className="text-paper/40"> · PUSHED BY NEXCONN</span>}
+                  <p className="mt-2 line-clamp-2 text-left text-[13px] font-semibold leading-snug text-paper/70 sm:text-center">
+                    {liveView.status === "live" && <span className="mr-1.5 inline-block rounded bg-red px-1.5 text-[10px] font-extrabold tracking-wider text-white align-middle">LIVE</span>}
+                    {liveView.detail}
                   </p>
-                </>
+                  {pushed && <p className="font-led mt-0.5 text-sm text-paper/40 sm:text-center">UPDATED VIA NEXCONN PUSH</p>}
+                </div>
               ) : (
                 <p className="font-led led-text text-[1.7rem] leading-none sm:truncate sm:text-4xl">
                   {st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "SCORE LINE APPEARS HERE")}
@@ -485,7 +533,9 @@ export function Room({ id }: { id: string }) {
             <div className="flex items-center gap-4 sm:justify-end">
               <div className="flex items-center gap-2 rounded-lg border-2 border-white/15 px-2.5 py-1">
                 {liveStatus === "live" ? <span className="live-dot" /> : <span className="h-2.5 w-2.5 rounded-full bg-white/30" />}
-                <span className="font-led text-xl">{liveStatus === "live" ? `LIVE · ${people ?? "…"}` : liveStatus === "connecting" ? "TUNING IN" : "RECONNECTING"}</span>
+                <button onClick={() => liveStatus === "offline" && setRetry((n) => n + 1)} className="font-led text-xl">
+                  {liveStatus === "live" ? `LIVE · ${people ?? "…"}` : liveStatus === "connecting" ? "TUNING IN" : "RECONNECTING · TAP"}
+                </button>
               </div>
               <div className="text-right">
                 <p className="font-led text-lg leading-none text-paper/55">YOU</p>
@@ -496,7 +546,7 @@ export function Room({ id }: { id: string }) {
         </div>
       </header>
 
-      <div className="mx-auto mt-6 max-w-7xl px-4">
+      <div className="mx-auto mt-3 max-w-7xl px-3 sm:mt-6 sm:px-4">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[17rem_minmax(0,1fr)_21rem] [&>*]:min-w-0">
           {/* ===== LEFT: you + table ===== */}
           <aside className={`flex flex-col gap-6 ${tab === "board" ? "" : "max-lg:hidden"}`}>
@@ -533,8 +583,8 @@ export function Room({ id }: { id: string }) {
           <div className={`flex flex-col gap-6 ${tab === "play" ? "" : "max-lg:hidden"}`}>
             <section className={`brut-lg relative overflow-hidden rounded-[24px] bg-paper text-ink ${late ? "shake" : ""}`}>
               {/* pitch strip */}
-              <div className="turf relative flex h-28 items-end justify-between border-b-[3px] border-ink px-4 pb-2 sm:h-32 sm:px-5">
-                <div className="flex flex-col items-start gap-1.5 pb-1">
+              <div className="turf relative flex min-h-[3.9rem] items-end justify-between gap-2 border-b-[3px] border-ink px-3 pb-2 pt-2 sm:h-32 sm:px-5 sm:pt-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 pb-0.5 sm:flex-col sm:items-start sm:pb-1">
                   <span
                     className={`font-led rounded-md border-2 border-ink px-2 text-xl shadow-[0_3px_0_var(--shadow)] ${
                       open ? "bg-lime" : phase === "pending" ? "bg-yellow" : phase === "settled" ? "bg-paper" : phase === "waiting" ? "bg-sand" : "bg-red text-white"
@@ -543,24 +593,24 @@ export function Room({ id }: { id: string }) {
                     {phaseLabel}
                   </span>
                   {moment?.ball && (
-                    <span className="font-led rounded-md bg-black/55 px-2 text-lg text-paper">
+                    <span className="font-led max-w-full truncate rounded-md bg-black/55 px-2 text-base text-paper sm:text-lg">
                       OVER {moment.ball.over} · {moment.ball.bowler} → {moment.ball.batter}
                     </span>
                   )}
                 </div>
-                <Art key={bolo} src={bolo} className="pop-in -mb-6 h-28 w-28 drop-shadow-[3px_4px_0_rgba(0,0,0,.35)] sm:h-36 sm:w-36" />
+                <Art key={bolo} src={bolo} className="pop-in -mb-3 h-16 w-16 shrink-0 drop-shadow-[3px_4px_0_rgba(0,0,0,.35)] sm:-mb-6 sm:h-36 sm:w-36" />
               </div>
 
-              <div className="p-5 sm:p-6">
-                <p className="text-sm font-bold text-muted">{headline}</p>
-                <h2 className="font-arcade mt-1 text-3xl leading-tight sm:text-4xl">
-                  {moment?.q ?? (st?.amHost ? "Ask the room something" : "The host is picking the moment")}
+              <div className="p-4 sm:p-6">
+                <p className="text-sm font-bold text-muted max-sm:hidden">{headline}</p>
+                <h2 className="font-arcade mt-1 text-2xl leading-tight sm:text-4xl">
+                  {moment?.q ?? (!room ? "Getting the room ready…" : room.mode === "replay" ? "First ball coming up…" : st?.amHost ? "Ask the room something" : "The host is picking the moment")}
                 </h2>
-                {moment?.ball?.need && <p className="font-led mt-1 text-2xl text-orange-d">{moment.ball.need.toUpperCase()}</p>}
+                {moment?.ball?.need && <p className="font-led mt-1 text-2xl text-orange-d max-sm:hidden">{moment.ball.need.toUpperCase()}</p>}
 
                 {/* lock fuse */}
                 {phase === "open" && lockIn !== null && (
-                  <div className="mt-4 flex items-center gap-2">
+                  <div className="mt-3 flex items-center gap-2 sm:mt-4">
                     <Art src="b2/stopwatch" className="h-7 w-7" />
                     <div className="flex flex-1 gap-[3px]">
                       {Array.from({ length: 24 }).map((_, k) => {
@@ -579,7 +629,7 @@ export function Room({ id }: { id: string }) {
 
                 {/* options: arcade keycaps */}
                 {moment && (
-                  <div className={`mt-6 grid gap-3.5 ${moment.options.length > 4 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
+                  <div ref={keysRef} className={`mt-4 grid scroll-mt-28 gap-3 sm:mt-6 sm:gap-3.5 ${moment.options.length > 4 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
                     {moment.options.map((o, i) => {
                       const count = st?.tally?.mid === moment.mid ? st.tally.counts[o.id] ?? 0 : 0;
                       const total = st?.tally?.mid === moment.mid ? st.tally.total : 0;
@@ -602,12 +652,12 @@ export function Room({ id }: { id: string }) {
                                 : "shadow-[0_6px_0_var(--shadow)] hover:-translate-y-0.5 hover:shadow-[0_8px_0_var(--shadow)] active:translate-y-[5px] active:shadow-[0_1px_0_var(--shadow)]"
                           }`}
                         >
-                          <div className="flex items-center gap-3 px-3.5 pb-3 pt-3">
-                            <span className="font-led grid h-11 min-w-11 shrink-0 place-items-center rounded-xl border-2 border-ink bg-paper px-1 text-2xl transition-transform group-hover:-rotate-6">
+                          <div className="flex min-h-[3.75rem] items-center gap-2.5 px-3 pb-2.5 pt-2.5 sm:gap-3 sm:px-3.5 sm:pb-3 sm:pt-3">
+                            <span className="font-led grid h-9 min-w-9 shrink-0 place-items-center rounded-lg border-2 border-ink bg-paper px-1 text-xl transition-transform group-hover:-rotate-6 sm:h-11 sm:min-w-11 sm:rounded-xl sm:text-2xl">
                               +{o.points}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="font-arcade text-[15px] leading-[1.05] [overflow-wrap:anywhere] sm:text-base">{o.label}</p>
+                              <p className="font-arcade text-[14px] leading-[1.05] sm:text-base">{o.label}</p>
                               <p className="font-led text-lg leading-none text-ink/60">{total ? `${count} · ${pct}%` : "–"}</p>
                             </div>
                             {picked && !isResult && <Art src="b2/check" className="pop-in h-9 w-9" />}
@@ -676,7 +726,7 @@ export function Room({ id }: { id: string }) {
                   const pick = myCalls[r.mid];
                   const right = !!pick && pick === r.outcome;
                   return (
-                    <div key={r.mid} className="group relative shrink-0">
+                    <button key={r.mid} type="button" className="group relative shrink-0 outline-none" aria-label={`${r.label}: ${r.detail ?? ""}`}>
                       <div
                         className={`rise grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink text-sm font-black shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-1 ${
                           pick ? (right ? "bg-lime text-ink" : "bg-k-rose text-ink") : "bg-sand text-ink"
@@ -684,12 +734,12 @@ export function Room({ id }: { id: string }) {
                       >
                         {short(r.label)}
                       </div>
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border-2 border-ink bg-paper p-2 text-xs text-ink shadow-[0_3px_0_var(--shadow)] group-hover:block">
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border-2 border-ink bg-paper p-2 text-xs text-ink shadow-[0_3px_0_var(--shadow)] group-hover:block group-focus:block">
                         <b>{r.label}</b> · {r.detail ?? ""}
                         <br />
                         {r.winners.length}/{r.total} called it{pick ? (right ? " · you too ✓" : " · not you") : ""}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -699,6 +749,7 @@ export function Room({ id }: { id: string }) {
 
           {/* ===== RIGHT: the dugout ===== */}
           <div className={`flex flex-col gap-6 ${tab === "chat" ? "" : "max-lg:hidden"}`}>
+            <div className="max-lg:order-2">
             <Huddle
               roomId={id}
               meId={me?.userId}
@@ -709,6 +760,7 @@ export function Room({ id }: { id: string }) {
               toast={toast.show}
               onChange={fetchState}
             />
+            </div>
             <ChatBox
               chat={chat}
               now={now}
@@ -885,7 +937,7 @@ function ChatBox({
   }, [visible.length]);
 
   return (
-    <section className="brut flex h-[34rem] flex-col overflow-hidden rounded-[20px] bg-stage-2 lg:h-[36rem]">
+    <section className="brut flex h-[calc(100dvh-12.5rem)] min-h-[22rem] flex-col overflow-hidden rounded-[20px] bg-stage-2 max-lg:order-1 lg:h-[36rem]">
       <div className="flex items-center justify-between gap-2 border-b-2 border-ink bg-stage-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <Art src="b2/megaphone" className="h-8 w-8" />

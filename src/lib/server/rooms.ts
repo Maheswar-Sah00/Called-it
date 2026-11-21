@@ -15,7 +15,7 @@ import {
   type TallyCard,
 } from "@/lib/game";
 import replayData from "@/data/t20wc2024final.json";
-import { createOpenChannel, sendToRoom, setRoomMetadata } from "./nexconn";
+import { createOpenChannel, destroyOpenChannels, sendToRoom, setRoomMetadata } from "./nexconn";
 import {
   callIfOpen,
   getJSON,
@@ -29,6 +29,9 @@ import {
   setJSON,
   setMoment,
   zincr,
+  zadd,
+  zoldest,
+  zrem,
   ztop,
 } from "./store";
 import { findMatch, scoreLine } from "./live";
@@ -94,12 +97,21 @@ export async function createRoom(opts: {
     createdAt: Date.now(),
     match: opts.match ?? null,
   };
-  const r = await createOpenChannel(channelId, { phase: "waiting", room: opts.name });
+  // Demo rooms close after 60 idle minutes (Nexconn's minimum); real rooms after a day.
+  const ttl = opts.demo ? 60 : 1440;
+  const meta = { phase: "waiting", room: opts.name };
+  let r = await createOpenChannel(channelId, meta, ttl);
+  if (r.code !== 0) {
+    // Free plan: 50 open channels at once. Recycle the oldest demo channels, then retry once.
+    const freed = await recycleDemoChannels(6);
+    if (freed > 0) r = await createOpenChannel(channelId, meta, ttl);
+  }
   if (r.code !== 0) throw new Error(`open channel create failed: ${r.code} ${r.errorMessage ?? ""}`);
+  await zadd(opts.demo ? CH_DEMO : CH_REAL, channelId, Date.now());
   await setJSON(K.room(id), room);
   await rememberName(id, opts.hostId, opts.hostName, opts.hostAvatar);
   if (opts.mode === "replay") {
-    await setJSON(K.replay(id), { index: 0, phase: "idle", nextAt: Date.now() + 2500 });
+    await setJSON(K.replay(id), { index: 0, phase: "idle", nextAt: Date.now() + 6000 });
   }
   if (!opts.demo) {
     await sadd("impact:rooms", id);
@@ -108,6 +120,19 @@ export async function createRoom(opts: {
     for (const [botId, botName] of Object.entries(BOT_NAMES)) await hset(K.names(id), botId, botName);
   }
   return { room, channelMs: r.ms };
+}
+
+/** Channel registry: Nexconn has no "list channels" API, so we keep our own. */
+export const CH_DEMO = "nx:channels:demo";
+export const CH_REAL = "nx:channels:real";
+
+/** Close the oldest demo channels to free Free-plan slots. Returns how many were closed. */
+export async function recycleDemoChannels(n: number) {
+  const oldest = await zoldest(CH_DEMO, n);
+  if (!oldest.length) return 0;
+  await destroyOpenChannels(oldest).catch(() => null);
+  await zrem(CH_DEMO, ...oldest);
+  return oldest.length;
 }
 
 export async function getRoom(id: string) {
@@ -331,7 +356,8 @@ function needLine(scoreAfter: string, ballIndexAfter: number) {
  */
 export async function tick(room: RoomPublic) {
   if (room.mode !== "replay") return { acted: false };
-  if (!(await lease(K.tickLease(room.id), 1500))) return { acted: false };
+  const tickToken = await lease(K.tickLease(room.id), 15_000);
+  if (!tickToken) return { acted: false };
   try {
     const st = (await getJSON<{ index: number; phase: string; nextAt: number }>(K.replay(room.id))) ?? {
       index: 0,
@@ -381,7 +407,7 @@ export async function tick(room: RoomPublic) {
     }
     return { acted: false };
   } finally {
-    await release(K.tickLease(room.id));
+    await release(K.tickLease(room.id), tickToken);
   }
 }
 
@@ -410,7 +436,7 @@ export async function setHuddle(room: RoomPublic, h: HuddleInfo) {
  */
 export async function syncScore(room: RoomPublic) {
   if (!room.match) return { changed: false, reason: "no match" };
-  if (!(await lease(K.scoreLease(room.id), 25_000))) return { changed: false, reason: "fresh" };
+  if (!(await lease(K.scoreLease(room.id), 25_000))) return { changed: false, reason: "fresh" }; // expires on its own, never released
   const m = await findMatch(room.match.sport, room.match.id);
   if (!m) return { changed: false, reason: "not in feed" };
   const packed = JSON.stringify({
@@ -425,6 +451,12 @@ export async function syncScore(room: RoomPublic) {
   return { changed: true, ms: r.ms, line: scoreLine(m) };
 }
 
+/** Is this user part of the room (joined at least once)? */
+export async function isMember(roomId: string, userId: string) {
+  const names = await hgetall(K.names(roomId));
+  return userId in names;
+}
+
 export async function getHuddle(roomId: string) {
   return getJSON<HuddleInfo>(K.huddle(roomId));
 }
@@ -434,11 +466,12 @@ export function presetsFor(sport: Sport) {
 }
 
 export async function withHostLease<T>(roomId: string, fn: () => Promise<T>): Promise<T | null> {
-  if (!(await lease(K.hostLease(roomId), 4000))) return null;
+  const token = await lease(K.hostLease(roomId), 15_000);
+  if (!token) return null;
   try {
     return await fn();
   } finally {
-    await release(K.hostLease(roomId));
+    await release(K.hostLease(roomId), token);
   }
 }
 

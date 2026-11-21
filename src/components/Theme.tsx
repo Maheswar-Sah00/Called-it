@@ -30,12 +30,17 @@ function readPref(): ThemePref {
 export function useTheme() {
   const [pref, setPref] = useState<ThemePref>("auto");
   const [theme, setTheme] = useState<"day" | "night">("night");
+  const [loaded, setLoaded] = useState(false);
 
+  // read the saved choice first; the <head> boot script has already painted the right theme
   useEffect(() => {
     setPref(readPref());
+    setTheme(document.documentElement.dataset.theme === "day" ? "day" : "night");
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
+    if (!loaded) return; // never apply the default before the saved choice is known (no flip on load)
     const apply = () => {
       const t = resolveTheme(pref);
       document.documentElement.dataset.theme = t;
@@ -46,7 +51,7 @@ export function useTheme() {
     if (pref !== "auto") return;
     const id = setInterval(apply, 60_000); // flips at 6 am / 6 pm on its own
     return () => clearInterval(id);
-  }, [pref]);
+  }, [pref, loaded]);
 
   const choose = (p: ThemePref) => {
     try {
@@ -106,7 +111,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
             role="radio"
             aria-checked={on}
             onClick={() => choose(o.k)}
-            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
+            className={`flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
               on ? "bg-orange text-ink shadow-[0_2px_0_var(--shadow)]" : "text-on-muted hover:bg-stage-3 hover:text-on"
             }`}
           >

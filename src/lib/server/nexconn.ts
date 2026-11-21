@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
  * Nexconn Platform Chat API client (server only).
@@ -38,7 +38,9 @@ export function verifyWebhook(headers: Headers): boolean {
   const sig = (headers.get("signature") || "").toLowerCase();
   if (!nonce || !ts || !sig) return false;
   if (Math.abs(Date.now() - Number(ts)) > 5 * 60_000) return false; // replay window
-  return sign(nonce, ts) === sig;
+  const want = Buffer.from(sign(nonce, ts));
+  const got = Buffer.from(sig);
+  return want.length === got.length && timingSafeEqual(want, got);
 }
 
 export type NexconnResult<T = unknown> = { code: number; result?: T; ms: number; errorMessage?: string };
@@ -83,11 +85,11 @@ export async function issueToken(userId: string, name: string) {
 }
 
 /** Create an open channel for a match room. Destroyed after 24 h of inactivity. */
-export async function createOpenChannel(channelId: string, metadata?: Record<string, string>) {
+export async function createOpenChannel(channelId: string, metadata?: Record<string, string>, ttlMinutes = 1440) {
   return nexconn("/v4/open-channel/create", {
     channelId,
     destroyType: 0,
-    ttlMinutes: 1440,
+    ttlMinutes: Math.min(Math.max(ttlMinutes, 60), 10080), // Nexconn range 60–10,080; closes after this much inactivity
     ...(metadata ? { metadataOwnerId: BOT_ID, metadata } : {}),
   });
 }
@@ -121,6 +123,12 @@ export async function setRoomMetadata(channelId: string, metadata: Record<string
     metadataOwnerId: BOT_ID,
     metadata,
   });
+}
+
+/** Close open channels now (Free plan allows 50 at once, so finished demo rooms are recycled). */
+export async function destroyOpenChannels(channelIds: string[]) {
+  if (!channelIds.length) return { code: 0, ms: 0 };
+  return nexconn("/v4/open-channel/destroy", { channelIds });
 }
 
 /** Host control: mute a participant in the room. */
