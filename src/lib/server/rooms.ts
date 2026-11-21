@@ -31,6 +31,7 @@ import {
   zincr,
   ztop,
 } from "./store";
+import { findMatch } from "./live";
 import { BOT_AVATARS, BOT_NAMES, botCall, botLine } from "./bots";
 
 type ReplayBall = {
@@ -76,6 +77,7 @@ export async function createRoom(opts: {
   hostName: string;
   hostAvatar?: string;
   demo: boolean;
+  match?: RoomPublic["match"];
 }) {
   const id = newRoomId();
   const channelId = `ci_${id}`;
@@ -88,6 +90,7 @@ export async function createRoom(opts: {
     channelId,
     demo: opts.demo,
     createdAt: Date.now(),
+    match: opts.match ?? null,
   };
   const r = await createOpenChannel(channelId, { phase: "waiting", room: opts.name });
   if (r.code !== 0) throw new Error(`open channel create failed: ${r.code} ${r.errorMessage ?? ""}`);
@@ -168,6 +171,7 @@ export async function roomState(roomId: string, userId: string | null): Promise<
     myCall,
     names: await roomNames(roomId),
     huddle: await getJSON<HuddleInfo>(K.huddle(roomId)),
+    live: room.match ? await findMatch(room.match.sport, room.match.id).catch(() => null) : null,
     amHost: !!userId && userId === room.hostId,
     scoreline: m.scoreline || lastResult?.scoreline || null,
     replay,

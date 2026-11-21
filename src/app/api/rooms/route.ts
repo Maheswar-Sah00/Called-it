@@ -16,6 +16,7 @@ export async function POST(req: Request) {
     sport?: Sport;
     mode?: "host" | "replay";
     demo?: boolean;
+    match?: { id?: string; sport?: string; title?: string; league?: string };
   };
   const sport = SPORTS.includes(body.sport as Sport) ? (body.sport as Sport) : "cricket";
   const mode = body.mode === "replay" ? "replay" : "host";
@@ -29,6 +30,15 @@ export async function POST(req: Request) {
       hostName: s.name,
       hostAvatar: s.avatar,
       demo: !!body.demo,
+      match:
+        body.match?.id && mode === "host"
+          ? {
+              id: String(body.match.id).slice(0, 40),
+              sport,
+              title: String(body.match.title ?? name).slice(0, 80),
+              league: String(body.match.league ?? "").slice(0, 60),
+            }
+          : null,
     });
     return ok({ room, channelMs });
   } catch (e) {

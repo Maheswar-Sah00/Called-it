@@ -146,7 +146,7 @@ export function Modal({ open, onClose, children, wide = false }: { open: boolean
         aria-modal
       >
         <div className="absolute inset-x-0 top-0 h-2 rounded-t-[19px] bg-[repeating-linear-gradient(90deg,var(--orange)_0_18px,var(--yellow)_18px_36px)]" />
-        <button onClick={onClose} className="key key-paper key-sm absolute right-4 top-5 !h-9 !w-9 !p-0 text-lg" aria-label="Close">
+        <button onClick={onClose} className="key key-paper key-sm !absolute right-4 top-5 !h-9 !w-9 !p-0 text-lg" aria-label="Close">
           ×
         </button>
         {children}

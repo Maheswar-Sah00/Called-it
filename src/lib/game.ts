@@ -279,6 +279,21 @@ export type ResultCard = {
   at: number;
 };
 
+/** A real match from the live feed. */
+export type LiveMatch = {
+  id: string;
+  sport: Sport;
+  league: string;
+  title: string;
+  short: string;
+  status: "live" | "soon" | "done";
+  statusText: string;
+  detail: string;
+  startsAt: number;
+  venue: string;
+  teams: { name: string; abbr: string; score: string; logo: string; winner: boolean }[];
+};
+
 export type RoomPublic = {
   id: string;
   name: string;
@@ -288,6 +303,8 @@ export type RoomPublic = {
   channelId: string;
   demo: boolean;
   createdAt: number;
+  /** the real match this room follows, if picked from the live list */
+  match?: { id: string; sport: Sport; title: string; league: string } | null;
 };
 
 export type RoomState = {
@@ -301,6 +318,8 @@ export type RoomState = {
   amHost: boolean;
   scoreline: string | null;
   huddle: HuddleInfo;
+  /** latest from the live feed when the room follows a real match */
+  live?: LiveMatch | null;
   replay?: { index: number; nextAt: number; phase: string; total: number; title: string; setup: string } | null;
 };
 

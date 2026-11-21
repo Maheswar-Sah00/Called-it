@@ -421,9 +421,32 @@ export function Room({ id }: { id: string }) {
               </div>
             </div>
             <div className="min-w-0 text-left sm:text-center">
-              <p className="font-led led-text text-[1.7rem] leading-none sm:truncate sm:text-4xl">
-                {st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "SCORE LINE APPEARS HERE")}
-              </p>
+              {st?.live && st.live.teams.length === 2 && st.live.sport !== "f1" ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:justify-center">
+                    {st.live.teams.map((t, i) => (
+                      <span key={t.name} className="flex items-center gap-2">
+                        {i === 1 && <span className="font-led text-2xl text-paper/40">v</span>}
+                        {t.logo && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={t.logo} alt="" className="h-7 w-7 object-contain" />
+                        )}
+                        <span className="font-led led-text text-[1.6rem] leading-none sm:text-3xl">
+                          {t.abbr} {t.score}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="font-led mt-1 truncate text-lg text-paper/60">
+                    {st.live.status === "live" ? "● LIVE · " : ""}
+                    {(st.live.detail || st.live.statusText).toUpperCase()}
+                  </p>
+                </>
+              ) : (
+                <p className="font-led led-text text-[1.7rem] leading-none sm:truncate sm:text-4xl">
+                  {st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "SCORE LINE APPEARS HERE")}
+                </p>
+              )}
               {st?.replay && (
                 <p className="font-led mt-1 text-lg text-paper/55">
                   BALL {Math.min(st.replay.index + 1, st.replay.total)}/{st.replay.total} · REAL CRICSHEET DATA
@@ -608,6 +631,8 @@ export function Room({ id }: { id: string }) {
               )}
             </section>
 
+            {st?.amHost && room?.mode === "host" && <HostPanel id={id} sport={sport} st={st} onDone={fetchState} toast={toast.show} />}
+
             {/* ball-by-ball strip */}
             <section className="brut rounded-[20px] bg-stage-2 p-4">
               <div className="flex items-center justify-between">
@@ -641,7 +666,6 @@ export function Room({ id }: { id: string }) {
               </div>
             </section>
 
-            {st?.amHost && room?.mode === "host" && <HostPanel id={id} sport={sport} st={st} onDone={fetchState} toast={toast.show} />}
           </div>
 
           {/* ===== RIGHT: the dugout ===== */}
