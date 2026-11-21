@@ -51,6 +51,11 @@ export function HostPanel({
         </div>
       </div>
 
+      {live && (
+        <p className="mt-4 rounded-xl border-2 border-dashed border-ink/25 p-3 text-sm text-muted lg:hidden">
+          Lock and call the result from the bar at the bottom of your screen.
+        </p>
+      )}
       {!live ? (
         <div className="rise mt-5">
           <p className="text-xs font-bold uppercase tracking-wider">1 · Pick the moment</p>
@@ -66,6 +71,9 @@ export function HostPanel({
           </div>
           {preset === "custom" && (
             <div className="rise mt-3 grid gap-2">
+              {(!q.trim() || labels.filter((l) => l.trim()).length < 2) && (
+                <p className="text-xs font-bold text-orange-d">Write the question and at least two answers.</p>
+              )}
               <input className="input" placeholder="Your question, e.g. Does Kohli reach 50?" value={q} maxLength={80} onChange={(e) => setQ(e.target.value)} />
               <div className="grid grid-cols-2 gap-2">
                 {labels.map((l, i) => (
@@ -93,7 +101,7 @@ export function HostPanel({
           <input className="input mt-2 !py-2 text-sm" placeholder="e.g. IND 182/4 · 18.2 ov" value={score} maxLength={60} onChange={(e) => setScore(e.target.value)} />
           <button
             className="key mt-5 w-full text-lg"
-            disabled={!!busy}
+            disabled={!!busy || (preset === "custom" && (!q.trim() || labels.filter((l) => l.trim()).length < 2))}
             onClick={() =>
               act("open", preset === "custom" ? { q, labels, seconds: secs } : { preset, seconds: secs })
             }
@@ -102,7 +110,7 @@ export function HostPanel({
           </button>
         </div>
       ) : (
-        <div className="rise mt-5 flex flex-col gap-4">
+        <div className="rise mt-5 flex flex-col gap-4 max-lg:hidden">
           {m.state === "open" && (
             <button
               className="key w-full !bg-red py-5 text-2xl text-white"

@@ -21,6 +21,7 @@ import { JoinSheet } from "@/components/JoinSheet";
 import { Art, Avatar, Brand, Modal, useToast } from "@/components/ui";
 import { ThemeToggle } from "@/components/Theme";
 import { HostPanel } from "./HostPanel";
+import { HostBar } from "./HostBar";
 import { NexconnPanel } from "./NexconnPanel";
 import { Celebration, type Celebrate } from "./Celebration";
 import { Huddle } from "./Huddle";
@@ -64,7 +65,7 @@ export function Room({ id }: { id: string }) {
   const [retry, setRetry] = useState(0);
   const keysRef = useRef<HTMLDivElement | null>(null);
   /** live score pushed by Nexconn channel metadata (beats the polled copy) */
-  const [pushed, setPushed] = useState<{ s: string; d: string; t: [string, string, string][]; at: number } | null>(null);
+  const [pushed, setPushed] = useState<{ s: string; p?: number; d: string; t: [string, string, string][]; at: number } | null>(null);
   const offset = useRef(0);
   const liveRef = useRef<Live | null>(null);
   const shownMid = useRef<string | null>(null);
@@ -158,7 +159,7 @@ export function Room({ id }: { id: string }) {
         case "metadata":
           if (e.data.live) {
             try {
-              const v = JSON.parse(e.data.live) as { s: string; d: string; t: [string, string, string][] };
+              const v = JSON.parse(e.data.live) as { s: string; p?: number; d: string; t: [string, string, string][] };
               setPushed({ ...v, at: Date.now() });
             } catch {
               /* ignore a malformed value */
@@ -397,9 +398,9 @@ export function Room({ id }: { id: string }) {
   const liveView =
     room?.match && sport !== "f1"
       ? pushed
-        ? { status: pushed.s, detail: pushed.d, teams: pushed.t.map(([abbr, score, logo]) => ({ abbr, score, logo })) }
+        ? { status: pushed.s, paused: !!pushed.p, detail: pushed.d, teams: pushed.t.map(([abbr, score, logo]) => ({ abbr, score, logo })) }
         : st?.live
-          ? { status: st.live.status, detail: st.live.detail || st.live.statusText, teams: st.live.teams.map((t) => ({ abbr: t.abbr, score: t.score, logo: t.logo })) }
+          ? { status: st.live.status, paused: !!st.live.paused, detail: st.live.detail || st.live.statusText, teams: st.live.teams.map((t) => ({ abbr: t.abbr, score: t.score, logo: t.logo })) }
           : null
       : null;
   const open = phase === "open" && !clientLocked;
@@ -440,7 +441,7 @@ export function Room({ id }: { id: string }) {
   const calledCount = visibleResults.filter((r) => myCalls[r.mid]).length;
 
   return (
-    <main className="min-h-screen pb-28 lg:pb-16">
+    <main className={`min-h-screen lg:pb-16 ${st?.amHost && st.room.mode === "host" ? "pb-64" : "pb-28"}`}>
       {/* ===== phones: compact sticky score bar ===== */}
       <div className="led sticky top-0 z-30 !rounded-none !border-x-0 !border-t-0 px-3 pb-2 pt-2.5 text-paper !shadow-[0_3px_0_var(--shadow)] sm:hidden">
         <div className="flex items-center gap-2">
@@ -514,7 +515,11 @@ export function Room({ id }: { id: string }) {
                     ))}
                   </div>
                   <p className="mt-2 line-clamp-2 text-left text-[13px] font-semibold leading-snug text-paper/70 sm:text-center">
-                    {liveView.status === "live" && <span className="mr-1.5 inline-block rounded bg-red px-1.5 text-[10px] font-extrabold tracking-wider text-white align-middle">LIVE</span>}
+                    {liveView.status === "live" && (
+                      <span className={`mr-1.5 inline-block rounded px-1.5 align-middle text-[10px] font-extrabold tracking-wider ${liveView.paused ? "bg-k-butter text-ink" : "bg-red text-white"}`}>
+                        {liveView.paused ? "BREAK" : "LIVE"}
+                      </span>
+                    )}
                     {liveView.detail}
                   </p>
                   {pushed && <p className="font-led mt-0.5 text-sm text-paper/40 sm:text-center">UPDATED VIA NEXCONN PUSH</p>}
@@ -636,12 +641,13 @@ export function Room({ id }: { id: string }) {
                       const pct = total ? Math.round((count / total) * 100) : 0;
                       const picked = myPick === o.id;
                       const isResult = phase === "settled" && shownResult?.mid === moment.mid && shownResult.outcome === o.id;
-                      const closed = !open;
+                      const hostView = !!st?.amHost && room?.mode === "host";
+                      const closed = !open || hostView;
                       return (
                         <button
                           key={o.id}
-                          onClick={() => call(o.id)}
-                          disabled={!me}
+                          onClick={() => !hostView && call(o.id)}
+                          disabled={!me || hostView}
                           className={`group relative overflow-hidden rounded-2xl border-[2.5px] border-ink text-left transition-all duration-100 ${
                             isResult ? "bg-lime" : picked ? "bg-orange" : KEY_FACES[i % KEY_FACES.length]
                           } ${
@@ -710,7 +716,24 @@ export function Room({ id }: { id: string }) {
               )}
             </section>
 
-            {st?.amHost && room?.mode === "host" && <HostPanel id={id} sport={sport} st={st} onDone={fetchState} toast={toast.show} />}
+            {st?.amHost && room?.mode === "host" && (
+              <>
+                <HostBar
+                  id={id}
+                  sport={sport}
+                  st={st}
+                  onDone={fetchState}
+                  toast={toast.show}
+                  onOptimistic={(state) => {
+                    if (state === null) return void fetchState();
+                    setSt((x) => (x && x.moment ? { ...x, moment: { ...x.moment, state: state as "open" | "locked" | "pending" | "settled" } } : x));
+                  }}
+                />
+                <div id="host-more">
+                  <HostPanel id={id} sport={sport} st={st} onDone={fetchState} toast={toast.show} />
+                </div>
+              </>
+            )}
 
             {/* ball-by-ball strip */}
             <section className="brut rounded-[20px] bg-stage-2 p-4">
@@ -886,7 +909,7 @@ function TableCard({
             {isHost && b.id !== meId && !b.id.startsWith("bot_") && (
               <button
                 onClick={() => mute(b.id, b.name)}
-                className="hidden rounded-md border border-paper/40 px-1.5 text-[10px] font-bold hover:bg-red group-hover:inline"
+                className="rounded-md border border-paper/40 px-1.5 py-1 text-[10px] font-bold hover:bg-red lg:hidden lg:group-hover:inline"
                 title="Mute for 10 minutes"
               >
                 MUTE

@@ -34,11 +34,12 @@ type EspnEvent = {
   location?: string;
   description?: string;
   title?: string;
-  fullStatus?: { longSummary?: string; summary?: string; session?: string; type?: { shortDetail?: string; detail?: string; state?: string } };
+  fullStatus?: { longSummary?: string; summary?: string; session?: string; type?: { shortDetail?: string; detail?: string; state?: string; description?: string } };
   competitors?: EspnCompetitor[];
 };
 
 function normalise(sport: Sport, league: string, e: EspnEvent): LiveMatch {
+  const paused = /(stumps|lunch|tea|drinks|innings break|rain|bad light|delayed|interrupted|half ?time|scheduled to begin)/i.test(`${e.summary ?? ""} ${e.fullStatus?.type?.description ?? ""}`);
   const st = e.status === "in" ? "live" : e.status === "pre" ? "soon" : "done";
   const teams = (e.competitors ?? []).slice(0, 2).map((c) => ({
     name: c.displayName || c.name || c.abbreviation || "TBC",
@@ -61,6 +62,7 @@ function normalise(sport: Sport, league: string, e: EspnEvent): LiveMatch {
     statusText: e.fullStatus?.type?.shortDetail && st !== "live" ? e.fullStatus.type.shortDetail : e.summary || e.fullStatus?.type?.detail || "",
     detail: e.fullStatus?.longSummary || e.description || e.title || "",
     startsAt: e.date ? Date.parse(e.date) : 0,
+    paused: st === "live" && paused,
     venue: e.location || "",
     teams,
   };

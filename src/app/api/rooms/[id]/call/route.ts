@@ -13,6 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (limited(`call:${s.userId}`, 30, 10_000)) return fail(429, "Easy there");
   const room = await getRoom(id);
   if (!room) return fail(404, "Room not found");
+  if (room.mode === "host" && room.hostId === s.userId) return fail(403, "The host calls the result, not the moment");
   const body = (await readBody(req)) as { mid?: string; option?: string; tapAt?: number };
   const mid = str(body.mid, 32);
   const option = str(body.option, 32);

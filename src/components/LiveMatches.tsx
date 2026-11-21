@@ -54,6 +54,19 @@ function when(m: LiveMatch) {
   return `${today ? "Today" : d.toLocaleDateString([], { weekday: "short" })} ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 }
 
+/** LIVE (red, in play) or BREAK (stumps, lunch, rain, half time). */
+export function LiveBadge({ paused, small = false }: { paused?: boolean; small?: boolean }) {
+  return (
+    <span
+      className={`flex shrink-0 items-center gap-1 rounded-full border-2 border-ink font-extrabold ${small ? "px-1.5 text-[9px]" : "px-2 py-0.5 text-[10px]"} ${
+        paused ? "bg-k-butter text-ink" : "bg-red text-white"
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${paused ? "bg-ink/50" : "bg-white"}`} /> {paused ? "BREAK" : "LIVE"}
+    </span>
+  );
+}
+
 function Logo({ src, abbr }: { src: string; abbr: string }) {
   const [bad, setBad] = useState(!src);
   return bad ? (
@@ -79,9 +92,7 @@ export function MatchRow({ m, selected, onPick, cta = "Open room" }: { m: LiveMa
           <span className="truncate">{m.league}</span>
         </span>
         {m.status === "live" ? (
-          <span className="flex shrink-0 items-center gap-1.5 rounded-full border-2 border-ink bg-red px-2 py-0.5 text-[10px] font-extrabold text-white">
-            <span className="h-1.5 w-1.5 rounded-full bg-white" /> LIVE
-          </span>
+          <LiveBadge paused={m.paused} />
         ) : (
           <span className="shrink-0 rounded-full border-2 border-ink bg-k-sand px-2 py-0.5 text-[10px] font-extrabold">{when(m)}</span>
         )}
@@ -186,8 +197,8 @@ export function MatchTicket({ m, i, onPick }: { m: LiveMatch; i: number; onPick:
         <div className={`relative grid h-32 place-items-center overflow-hidden rounded-[14px] border-2 border-ink ${BANDS[m.sport] ?? "bg-k-sand"}`}>
           <span className="absolute left-2 top-1.5 max-w-[70%] truncate text-[10px] font-extrabold uppercase tracking-wide text-ink/60">{m.league}</span>
           {m.status === "live" ? (
-            <span className="absolute right-2 top-1.5 flex items-center gap-1 rounded-full border-2 border-ink bg-red px-1.5 text-[9px] font-extrabold text-white">
-              <span className="h-1.5 w-1.5 rounded-full bg-white" /> LIVE
+            <span className="absolute right-2 top-1.5">
+              <LiveBadge paused={m.paused} small />
             </span>
           ) : (
             <span className="absolute right-2 top-1.5 rounded-full border-2 border-ink bg-paper px-1.5 text-[9px] font-extrabold">{when(m)}</span>

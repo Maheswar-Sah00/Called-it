@@ -441,6 +441,7 @@ export async function syncScore(room: RoomPublic) {
   if (!m) return { changed: false, reason: "not in feed" };
   const packed = JSON.stringify({
     s: m.status,
+    p: m.paused ? 1 : 0,
     d: (m.detail || m.statusText).slice(0, 140),
     t: m.teams.map((t) => [t.abbr, t.score, t.logo]),
   });

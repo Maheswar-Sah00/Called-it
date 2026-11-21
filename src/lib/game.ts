@@ -290,6 +290,8 @@ export type LiveMatch = {
   statusText: string;
   detail: string;
   startsAt: number;
+  /** in progress but at a break (stumps, lunch, rain, half time) */
+  paused?: boolean;
   venue: string;
   teams: { name: string; abbr: string; score: string; logo: string; winner: boolean }[];
 };
