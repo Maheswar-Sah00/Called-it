@@ -264,13 +264,13 @@ export default function Home() {
             {[
               { art: "b2/crown", t: "Bragging rights", d: "A live table everyone sees at once.", c: "bg-[#ffd23f]", r: "-rotate-3" },
               { art: "b2/flame", t: "Streak bonus", d: "Two right in a row: +5 on every call after.", c: "bg-[#ff7a1a]", r: "rotate-2" },
-              { art: "b2/megaphone", t: "Real banter", d: "Chat, stickers and voice huddles with the room.", c: "bg-[#ffc6d6]", r: "-rotate-2" },
+              { art: "b2/megaphone", t: "Real banter", d: "Live chat and sticker reactions with the whole room.", c: "bg-[#ffc6d6]", r: "-rotate-2" },
               { art: "b2/stopwatch", t: "Spoiler shield", d: "Results wait for your slower stream.", c: "bg-[#cdeeb4]", r: "rotate-3" },
               { art: "b2/lock", t: "Safe rooms", d: "No betting spam, links or forged results.", c: "bg-[#ffd2ad]", r: "-rotate-1" },
             ].map((p) => (
               <div
                 key={p.t}
-                className={`rounded-2xl border-[3px] border-ink ${p.c} p-4 text-[#140b08] shadow-[6px_6px_0_#000] transition-transform duration-300 hover:-translate-y-2 hover:rotate-0 ${p.r}`}
+                className={`perk rounded-2xl border-[3px] border-ink ${p.c} p-4 text-[#140b08] shadow-[6px_6px_0_#000] transition-transform duration-300 hover:-translate-y-2 hover:rotate-0 ${p.r}`}
               >
                 <Art src={p.art} className="h-20 w-20" />
                 <p className="font-display mt-2 text-xl font-extrabold leading-tight">{p.t}</p>
@@ -347,18 +347,6 @@ export default function Home() {
                 </li>
               ))}
             </ol>
-            <div className="flex items-start gap-3 border-t-[3px] border-ink bg-k-butter px-5 py-3">
-              <span className="font-led shrink-0 rounded border-2 border-ink bg-orange px-1 text-xl leading-tight">SUB</span>
-              <div className="min-w-0 flex-1">
-                <p className="font-display font-extrabold">
-                  Nexconn Call SDK <span className="font-led ml-1 text-lg font-normal text-muted">· voice + video huddles</span>
-                </p>
-                <p className="text-sm text-muted">
-                  Multi-party voice and video in every room: one tap to start, the room gets a priority “huddle is live” card, friends pick up or join late.
-                </p>
-              </div>
-              <Art src="b1/controller" className="h-9 w-9 shrink-0" />
-            </div>
           </div>
         </div>
       </section>

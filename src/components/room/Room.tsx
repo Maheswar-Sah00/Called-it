@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CALLS_ENABLED,
   CARD_TYPES,
   MT,
   REACTIONS,
@@ -772,6 +773,7 @@ export function Room({ id }: { id: string }) {
 
           {/* ===== RIGHT: the dugout ===== */}
           <div className={`flex flex-col gap-6 ${tab === "chat" ? "" : "max-lg:hidden"}`}>
+            {CALLS_ENABLED && (
             <div className="max-lg:order-2">
             <Huddle
               roomId={id}
@@ -784,6 +786,7 @@ export function Room({ id }: { id: string }) {
               onChange={fetchState}
             />
             </div>
+            )}
             <ChatBox
               chat={chat}
               now={now}

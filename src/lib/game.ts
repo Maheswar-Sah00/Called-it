@@ -251,6 +251,9 @@ export const MT = {
 export const CARD_TYPES: string[] = [MT.Moment, MT.Lock, MT.Tally, MT.Pending, MT.Result, MT.Huddle];
 
 /** A live voice/video huddle in a room (Nexconn Call SDK, multi-party). */
+/** Voice/video huddles (Nexconn Call SDK). Off until Call is subscribed in the Nexconn Console. */
+export const CALLS_ENABLED = false;
+
 export type HuddleInfo = { callId: string; media: "voice" | "video"; by: string; byName: string; at: number } | null;
 
 export type BallInfo = { over: string; bowler: string; batter: string; score: string; need?: string };

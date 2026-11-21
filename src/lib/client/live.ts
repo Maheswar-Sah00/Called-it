@@ -9,7 +9,7 @@
  * Everything it does is also logged to the "Nexconn inside" panel.
  */
 
-import { CARD_TYPES, MT } from "@/lib/game";
+import { CALLS_ENABLED, CARD_TYPES, MT } from "@/lib/game";
 
 export type LiveMsg = {
   id: string;
@@ -63,7 +63,7 @@ async function load(appKey: string) {
   if (!sdk) sdk = await import("@nexconn/chat");
   if (!initialised) {
     // The Call SDK's plumbing must be installed before the chat engine starts.
-    try {
+    if (CALLS_ENABLED) try {
       const call = await import("@nexconn/call");
       call.NCCallEngine.install();
       log("NCCallEngine.install", "voice + video ready");

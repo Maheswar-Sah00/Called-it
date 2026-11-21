@@ -108,6 +108,118 @@
   display: none !important;
 }
 
+/* Night = "Noir": black, white and greys only; one red for LIVE and LOCK.
+   Only UI tokens change here: images, stickers and emojis keep their own colours.
+   White surfaces on a black page; on a white card the accents invert to black. */
+:root:not([data-theme="day"]) {
+  --night: #000;
+  --night-2: #0e0e0e;
+  --night-3: #1c1c1c;
+  --stage: #000;
+  --stage-2: #0e0e0e;
+  --stage-3: #1c1c1c;
+  --on: #f5f5f5;
+  --on-muted: rgba(255, 255, 255, 0.56);
+  --line: rgba(255, 255, 255, 0.12);
+  --glow-a: rgba(255, 255, 255, 0.055);
+  --glow-b: rgba(255, 255, 255, 0.05);
+
+  --ink: #0a0a0a;
+  --shadow: #1f1f1f;
+  --paper: #f7f7f7;
+  --cream: #efefef;
+  --sand: #d9d9d9;
+  --muted: #6b6b6b;
+
+  --orange: #ffffff; /* primary = white */
+  --orange-d: #4a4a4a;
+  --yellow: #e8e8e8;
+  --red: #ff453a; /* LIVE / LOCK only */
+  --lime: #ffffff;
+  --pink: #e0e0e0;
+  --turf: #0a0a0a;
+  --turf-2: #131313;
+  --chalk: #101010;
+
+  --k-peach: #e4e4e4;
+  --k-butter: #efefef;
+  --k-leaf: #e6e6e6;
+  --k-rose: #d4d4d4;
+  --k-sand: #e9e9e9;
+  --k-lime: #ececec;
+
+  --led-bg: #050505;
+  --led-dot: rgba(255, 255, 255, 0.07);
+  --led-rim: #1c1c1c;
+  --led-glow: 0 0 6px rgba(255, 255, 255, 0.35), 0 0 16px rgba(255, 255, 255, 0.12);
+  --wm-edge: #000;
+  --wm-fill: linear-gradient(180deg, #ffffff 0%, #f4f4f4 34%, #c4c4c4 58%, #9a9a9a 80%, #e9e9e9 100%);
+}
+/* dark cards get a graphite hairline instead of an invisible black border */
+:root:not([data-theme="day"]) :is(.bg-stage-2, .bg-stage-3, .bg-night, .bg-night-2, .bg-night-3, .chalkboard, .led).border-ink,
+:root:not([data-theme="day"]) :is(.bg-stage-2, .bg-stage-3, .bg-night, .bg-night-2, .bg-night-3, .chalkboard, .led):is(.brut, .brut-sm, .brut-lg),
+:root:not([data-theme="day"]) .led,
+:root:not([data-theme="day"]) .chalkboard {
+  border-color: #2a2a2a;
+}
+:root:not([data-theme="day"]) .led-text,
+:root:not([data-theme="day"]) .wm-small {
+  color: #fff;
+}
+:root:not([data-theme="day"]) .wm-rim {
+  color: #3a3a3a;
+  -webkit-text-stroke-color: #3a3a3a;
+}
+/* secondary button on black: graphite with white text */
+:root:not([data-theme="day"]) .key-paper {
+  --face: #1c1c1c;
+  color: #f5f5f5;
+  border-color: #3a3a3a;
+}
+/* on a white card, the primary accent inverts to black */
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) :is(.bg-orange, .chip[data-on="true"]),
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) .key:not(.key-paper, .key-dark, .key-red, .key-yellow) {
+  --face: #0a0a0a;
+  background-color: #0a0a0a;
+  color: #fff;
+}
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) .bg-orange .bg-paper {
+  color: var(--ink);
+}
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) .bg-orange .text-ink\/60 {
+  color: rgba(255, 255, 255, 0.62);
+}
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) .bg-orange .bg-ink\/70 {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) .bg-orange .bg-black\/10 {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+:root:not([data-theme="day"]) :is(.bg-paper, .paper, .ticket) .ring-orange {
+  --tw-ring-color: var(--ink);
+}
+:root:not([data-theme="day"]) .input:focus {
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.22);
+}
+/* on the LED board, your pick is graphite and the result is white */
+:root:not([data-theme="day"]) .led .bg-orange {
+  background-color: #333;
+  color: #fff;
+}
+/* chat: your bubbles white, everyone else's graphite */
+:root:not([data-theme="day"]) .rounded-bl-sm.bg-paper {
+  background-color: #1f1f1f;
+  border-color: #333;
+  color: #f5f5f5;
+}
+:root:not([data-theme="day"]) .rounded-bl-sm.bg-paper .text-orange-d {
+  color: #a8a8a8;
+}
+/* landing perk cards: one white family instead of five colours */
+:root:not([data-theme="day"]) .perk {
+  background-color: var(--paper);
+}
+
 @theme inline {
   --color-night: var(--night);
   --color-night-2: var(--night-2);
@@ -651,4 +763,15 @@ body {
 }
 .score-flash {
   animation: score-flash 1.2s ease-out both;
+}
+@keyframes score-flash-noir {
+  0% {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+:root:not([data-theme="day"]) .score-flash {
+  animation-name: score-flash-noir;
 }
