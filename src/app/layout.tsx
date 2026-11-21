@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Bungee, DM_Sans, Titan_One, VT323 } from "next/font/google";
+import { Bricolage_Grotesque, Bungee, DM_Sans, Shrikhand, VT323 } from "next/font/google";
 import "./globals.css";
 import { themeBootScript } from "@/lib/theme-boot";
 
 const arcade = Bungee({ variable: "--font-arcade", weight: "400", subsets: ["latin"] });
 const display = Bricolage_Grotesque({ variable: "--font-display", weight: ["600", "700", "800"], subsets: ["latin"] });
 const body = DM_Sans({ variable: "--font-body", subsets: ["latin"] });
-const wm = Titan_One({ variable: "--font-wm", weight: "400", subsets: ["latin"] });
+const wm = Shrikhand({ variable: "--font-wm", weight: "400", subsets: ["latin"] });
 const led = VT323({ variable: "--font-led", weight: "400", subsets: ["latin"] });
 
 export const metadata: Metadata = {

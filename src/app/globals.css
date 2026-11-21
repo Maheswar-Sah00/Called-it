@@ -372,9 +372,9 @@ body {
   position: relative;
   display: inline-grid;
   font-family: var(--font-wm), var(--font-arcade), system-ui, sans-serif;
-  line-height: 0.92;
-  letter-spacing: 0.01em;
-  transform: rotate(-3deg) skewX(-7deg);
+  line-height: 0.98;
+  letter-spacing: 0.005em;
+  transform: rotate(-5deg);
   transform-origin: left center;
   white-space: nowrap;
 }
@@ -384,7 +384,7 @@ body {
 }
 .wm-back {
   color: var(--wm-edge);
-  -webkit-text-stroke: 0.17em var(--wm-edge);
+  -webkit-text-stroke: 0.14em var(--wm-edge);
   text-shadow:
     0.02em 0.03em 0 var(--wm-edge),
     0.04em 0.06em 0 var(--wm-edge),
@@ -394,7 +394,7 @@ body {
 }
 .wm-rim {
   color: var(--red);
-  -webkit-text-stroke: 0.075em var(--red);
+  -webkit-text-stroke: 0.06em var(--red);
 }
 .wm-front {
   background:
@@ -418,7 +418,7 @@ body {
 .wm-small {
   font-family: var(--font-wm), system-ui, sans-serif;
   color: var(--yellow);
-  -webkit-text-stroke: 0.09em var(--wm-edge);
+  -webkit-text-stroke: 0.08em var(--wm-edge);
   paint-order: stroke fill;
   text-shadow: 0.05em 0.07em 0 var(--wm-edge);
   letter-spacing: 0.02em;
