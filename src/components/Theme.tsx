@@ -110,8 +110,9 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
             key={o.k}
             role="radio"
             aria-checked={on}
+            aria-label={o.label}
             onClick={() => choose(o.k)}
-            className={`flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
+            className={`flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition-all ${
               on ? "bg-orange text-ink shadow-[0_2px_0_var(--shadow)]" : "text-on-muted hover:bg-stage-3 hover:text-on"
             }`}
           >

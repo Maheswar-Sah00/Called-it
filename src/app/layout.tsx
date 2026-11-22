@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Bungee, DM_Sans, Shrikhand, VT323 } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { themeBootScript } from "@/lib/theme-boot";
 
-const arcade = Bungee({ variable: "--font-arcade", weight: "400", subsets: ["latin"] });
-const display = Bricolage_Grotesque({ variable: "--font-display", weight: ["600", "700", "800"], subsets: ["latin"] });
-const body = DM_Sans({ variable: "--font-body", subsets: ["latin"] });
-const wm = Shrikhand({ variable: "--font-wm", weight: "400", subsets: ["latin"] });
-const led = VT323({ variable: "--font-led", weight: "400", subsets: ["latin"] });
+// Fonts ship with the app (latin subset from Google Fonts), so the build never depends on fetching them.
+const arcade = localFont({ src: "./fonts/bungee.woff2", variable: "--font-arcade", weight: "400", display: "swap" });
+const display = localFont({ src: "./fonts/bricolage.woff2", variable: "--font-display", weight: "600 800", display: "swap" });
+const body = localFont({ src: "./fonts/dmsans.woff2", variable: "--font-body", weight: "400 800", display: "swap" });
+const wm = localFont({ src: "./fonts/shrikhand.woff2", variable: "--font-wm", weight: "400", display: "swap" });
+const led = localFont({ src: "./fonts/vt323.woff2", variable: "--font-led", weight: "400", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Called It — watch apart, call it together",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SPORT_ART, SPORT_LABEL, SPORTS, type LiveMatch, type Sport } from "@/lib/game";
 import { api, useSession } from "@/lib/client/session";
 import { JoinSheet } from "./JoinSheet";
@@ -21,11 +21,15 @@ export function StartRoom({
   match?: LiveMatch | null;
 }) {
   const router = useRouter();
-  const { info, join } = useSession();
+  const sessionState = useSession();
+  const { info, join } = sessionState;
   const [sport, setSport] = useState<Sport>(initialSport ?? initialMatch?.sport ?? "cricket");
   const [match, setMatch] = useState<LiveMatch | null>(initialMatch ?? null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  // feed sports: the "name your own" field is one tap away, above the list (not under 50+ matches)
+  const [ownOpen, setOwnOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // picker open = show sports + list; closed = show the chosen match as one big card
   const [picking, setPicking] = useState(!initialMatch);
@@ -44,6 +48,8 @@ export function StartRoom({
   }
 
   async function create() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setErr(null);
     const r = await api<{ room: { id: string } }>("/api/rooms", {
@@ -55,17 +61,27 @@ export function StartRoom({
     if (!r.ok) {
       setErr(r.data.error ?? "Could not create the room");
       setBusy(false);
+      inFlight.current = false;
       return;
     }
     router.push(`/r/${r.data.room.id}`);
   }
 
-  const needName = info && !info.session;
+  const { loading, error: sessionError } = sessionState;
+  // still checking who you are: show a loader, not step 2 (it would jump back to the name step)
+  const needName = !loading && (sessionError ? !info?.session : !!info && !info.session);
   const feed = HAS_FEED.has(sport);
 
   return (
-    <Modal open={open} onClose={onClose} wide={!needName}>
-      {needName ? (
+    <Modal open={open} onClose={onClose} wide={!needName && !loading}>
+      {loading ? (
+        <div className="grid min-h-48 place-items-center" role="status" aria-live="polite">
+          <div className="flex items-center gap-3 text-sm font-bold text-muted">
+            <span className="h-5 w-5 animate-spin rounded-full border-[3px] border-ink/20 border-t-ink" />
+            Getting your seat…
+          </div>
+        </div>
+      ) : needName ? (
         <JoinSheet
           busy={busy}
           error={err}
@@ -121,25 +137,58 @@ export function StartRoom({
                     onClick={() => {
                       setSport(s);
                       setMatch(null);
+                      setOwnOpen(false);
                     }}
                     className={`flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-xl border-2 border-ink py-1 pl-1 pr-3 text-sm font-bold transition-all ${
                       sport === s ? "translate-y-[2px] bg-orange shadow-[0_1px_0_var(--shadow)]" : "bg-paper shadow-[0_3px_0_var(--shadow)] hover:-translate-y-0.5"
                     }`}
                   >
                     <Art src={SPORT_ART[s].bolo} className="h-8 w-8" />
-                    {s === "hockey" ? "Hockey" : SPORT_LABEL[s]}
+                    {s === "hockey" ? "Ice hockey" : SPORT_LABEL[s]}
                   </button>
                 ))}
               </div>
 
+              {/* your own match: above the list so nobody scrolls past 50 rows to find it */}
+              {!match && feed && !ownOpen && (
+                <button
+                  type="button"
+                  onClick={() => setOwnOpen(true)}
+                  className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-xl border-2 border-dashed border-ink/40 bg-k-sand/50 px-3 text-left text-sm font-extrabold"
+                >
+                  <span aria-hidden>✎</span> Not on TV? Name your own match
+                  <span className="ml-auto font-normal text-muted">gully, hostel, local</span>
+                </button>
+              )}
+              {!match && (!feed || ownOpen) && (
+                <div className="mt-3">
+                  <label htmlFor="own-match" className="text-xs font-bold uppercase tracking-wider text-muted">
+                    {feed ? "Your own match" : "Match name"}
+                  </label>
+                  <input
+                    id="own-match"
+                    className="input mt-1.5 text-base"
+                    placeholder={sport === "cricket" ? "e.g. Hostel league final" : "e.g. Sunday night with the gang"}
+                    value={name}
+                    maxLength={40}
+                    enterKeyHint="go"
+                    autoFocus={feed}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !busy && name.trim() && create()}
+                  />
+                </div>
+              )}
+
               {/* match */}
               {feed ? (
-                <div className="mt-3">
+                <div className="mt-4">
                   <p className="mb-2 text-sm font-bold">
                     Live and starting soon <span className="font-normal text-muted">· tap yours</span>
                   </p>
                   <LiveBrowser
+                    key={sport}
                     fixedSport={sport}
+                    limit={6}
                     compact
                     selectedId={match?.id}
                     onPick={(m) => {
@@ -150,27 +199,10 @@ export function StartRoom({
                 </div>
               ) : (
                 <p className="mt-3 rounded-xl border-2 border-dashed border-ink/25 bg-k-sand/50 p-3 text-sm text-muted">
-                  No live feed for {SPORT_LABEL[sport].toLowerCase()} yet. Name the match below and you keep the score yourself.
+                  No live feed for {SPORT_LABEL[sport].toLowerCase()} yet. Name the match above and you keep the score yourself.
                 </p>
               )}
 
-              {!match && (
-                <div className="mt-4">
-                  <label htmlFor="own-match" className="text-xs font-bold uppercase tracking-wider text-muted">
-                    {feed ? "Not in the list? Name your own" : "Match name"}
-                  </label>
-                  <input
-                    id="own-match"
-                    className="input mt-1.5 text-base"
-                    placeholder={sport === "cricket" ? "e.g. Hostel league final" : "e.g. Sunday night with the gang"}
-                    value={name}
-                    maxLength={40}
-                    enterKeyHint="go"
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !busy && name.trim() && create()}
-                  />
-                </div>
-              )}
             </>
           )}
 

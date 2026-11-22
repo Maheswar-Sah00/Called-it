@@ -101,8 +101,25 @@ export function Room({ id }: { id: string }) {
   const [people, setPeople] = useState<number | null>(null);
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [floats, setFloats] = useState<Floating[]>([]);
-  const [delay, setDelay] = useState(0);
+  const [delay, setDelayState] = useState(0);
+  const setDelay = useCallback((n: number) => {
+    setDelayState(n);
+    try {
+      localStorage.setItem("ci-shield", String(n));
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem("ci-shield"));
+      if ([5, 10, 20, 30, 45].includes(v)) setDelayState(v);
+    } catch {
+      /* private mode */
+    }
+  }, []);
   const [muted, setMuted] = useState(false);
+  const muteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lockFlash, setLockFlash] = useState(0);
   const [late, setLate] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState<Celebrate | null>(null);
@@ -137,7 +154,11 @@ export function Room({ id }: { id: string }) {
     setSt(r.data);
     // a room with no settled result yet: the very first result that lands deserves its celebration
     if (firstLoad.current && !r.data.lastResult) firstLoad.current = false;
-    if (r.data.moment && r.data.myCall) setMyCalls((m) => ({ ...m, [r.data.moment!.mid]: r.data.myCall! }));
+    // only touch myCalls when the call actually changed (a fresh object each poll re-ran the celebration and cancelled its auto-close)
+    if (r.data.moment && r.data.myCall) {
+      const mid = r.data.moment.mid, call = r.data.myCall;
+      setMyCalls((m) => (m[mid] === call ? m : { ...m, [mid]: call }));
+    }
     if (r.data.lastResult) {
       const lr = r.data.lastResult;
       setResults((rs) => (rs.some((x) => x.mid === lr.mid) ? rs : [...rs, lr].slice(-30)));
@@ -218,9 +239,13 @@ export function Room({ id }: { id: string }) {
         case "participants":
           setPeople(e.count);
           break;
-        case "muted":
+        case "muted": {
           setMuted(true);
+          if (muteTimer.current) clearTimeout(muteTimer.current);
+          // Nexconn has no unmute event: lift the lock when the mute runs out (the server still enforces it).
+          muteTimer.current = setTimeout(() => setMuted(false), Math.min(Math.max(e.ms ?? 10 * 60_000, 30_000), 2 * 60 * 60_000) + 1500);
           break;
+        }
         case "blocked":
           setStats((s) => ({ ...s, blocked: s.blocked + 1 }));
           toast.show(e.reason, "red");
@@ -232,7 +257,9 @@ export function Room({ id }: { id: string }) {
           if (e.data.live) {
             try {
               const v = JSON.parse(e.data.live) as { s: string; p?: number; d: string; t: [string, string, string][] };
-              setPushed({ ...v, at: Date.now() });
+              const hold = delayRef.current * 1000;
+              if (hold > 0) setTimeout(() => setPushed({ ...v, at: Date.now() }), hold);
+              else setPushed({ ...v, at: Date.now() });
             } catch {
               /* ignore a malformed value */
             }
@@ -265,15 +292,25 @@ export function Room({ id }: { id: string }) {
             return;
           }
           if (m.type === "RC:TxtMsg" && m.text) {
+            const sys = m.from === BOT_ID;
+            // Receiver-side guard: never show a friend's line that breaks the room rules, even if it
+            // skipped the sender's check (raw SDK send). The pre-messaging webhook blocks it server-side too.
+            const clean = sys ? m.text : m.text.replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 200);
+            if (!clean) return;
+            if (!sys && blockReason(clean)) {
+              setStats((s) => ({ ...s, blocked: s.blocked + 1 }));
+              log("guard", "hid a chat line that breaks the room rules");
+              return;
+            }
             setStats((s) => ({ ...s, chats: s.chats + 1 }));
             const mine = m.from === me?.userId;
-            if (!mine && tabRef.current !== "chat") setUnread((n) => Math.min(99, n + 1));
+            if (!mine && tabRef.current !== "chat" && delayRef.current === 0) setUnread((n) => Math.min(99, n + 1));
             setChat((c) =>
               c.some((l) => l.id === m.id)
                 ? c
                 : [
                     ...c.slice(-120),
-                    { id: m.id, from: m.from, text: m.text!, at: m.at, showAt: mine ? 0 : Date.now() + delayRef.current * 1000, sys: m.from === BOT_ID },
+                    { id: m.id, from: m.from, text: clean, at: m.at, showAt: mine ? 0 : Date.now() + delayRef.current * 1000, sys },
                   ],
             );
           }
@@ -356,7 +393,11 @@ export function Room({ id }: { id: string }) {
   const lockIn = moment?.lockAt ? moment.lockAt - serverNow : null;
   const clientLocked = phase === "open" && lockIn !== null && lockIn <= 0;
   const myPick = moment ? myCalls[moment.mid] ?? null : null;
-  const board = delay > 0 && shownResult ? shownResult.board : st?.board ?? [];
+  // Spoiler shield: while a result is held back, freeze the table and score line as they were before it.
+  const safe = useRef<{ board: NonNullable<typeof st>["board"]; scoreline: string | undefined }>({ board: [], scoreline: undefined });
+  if (st && !resultHidden) safe.current = { board: delay > 0 && shownResult ? shownResult.board : st.board, scoreline: st.scoreline ?? undefined };
+  const board = resultHidden ? safe.current.board : delay > 0 && shownResult ? shownResult.board : st?.board ?? [];
+  const scoreline = resultHidden ? safe.current.scoreline : st?.scoreline ?? undefined;
   const myRank = me ? board.findIndex((b) => b.id === me.userId) : -1;
   const myPoints = myRank >= 0 ? board[myRank].points : 0;
   const streak = useMemo(() => {
@@ -385,10 +426,17 @@ export function Room({ id }: { id: string }) {
     const pts = base === undefined ? undefined : base + (streak >= 2 ? STREAK_BONUS : 0);
     setCelebrate({ key: shownResult.mid, result: shownResult, pick: pick ?? null, right, sport: st?.room.sport ?? "other", points: pts });
     if (right) buzz([20, 40, 30]);
-    const t = setTimeout(() => setCelebrate(null), right ? 2600 : 1900);
-    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownResult, myCalls, st?.room.sport]);
+
+  // auto-close each celebration on its own clock (nothing else can cancel it)
+  const celebrateKey = celebrate?.key;
+  const celebrateRight = !!celebrate?.right;
+  useEffect(() => {
+    if (!celebrateKey) return;
+    const t = setTimeout(() => setCelebrate((c) => (c?.key === celebrateKey ? null : c)), celebrateRight ? 2600 : 1900);
+    return () => clearTimeout(t);
+  }, [celebrateKey, celebrateRight]);
 
   useEffect(() => {
     if (results.length && firstLoad.current && shownResult) {
@@ -465,7 +513,8 @@ export function Room({ id }: { id: string }) {
     const text = `Watching ${st?.room.name ?? "the match"}? Come call it with us on Called It: ${url}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Called It", text, url });
+        // The link rides in `text` only: passing `url` too makes WhatsApp show it twice.
+        await navigator.share({ title: "Called It", text });
         return;
       } catch {
         /* fall through to copy */
@@ -562,12 +611,12 @@ export function Room({ id }: { id: string }) {
               {liveStatus === "live" ? <span className="live-dot !h-2 !w-2 shrink-0" /> : <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-white/40" />}
               <span className="font-arcade truncate text-[13px] leading-tight">{room?.name ?? "Tuning in…"}</span>
             </span>
-            <span className="font-led led-text block truncate text-[17px] leading-tight">
+            <span className="font-led led-text block truncate text-[16px] leading-tight">
               {liveStatus === "offline"
                 ? "RECONNECTING · TAP"
                 : liveView && liveView.teams.length === 2
-                  ? `${liveView.teams[0].abbr} ${liveView.teams[0].score || "-"} · ${liveView.teams[1].abbr} ${liveView.teams[1].score || "-"}`
-                  : st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : liveStatus === "connecting" ? "TUNING IN…" : "")}
+                  ? `${liveView.paused ? "BREAK · " : ""}${liveView.teams[0].abbr} ${shortScore(liveView.teams[0].score)} · ${liveView.teams[1].abbr} ${shortScore(liveView.teams[1].score)}`
+                  : scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : liveStatus === "connecting" ? "TUNING IN…" : "")}
             </span>
           </button>
           <div className="shrink-0 text-right leading-none" aria-label={`${myPoints} points${people ? `, ${people} in the room` : ""}`}>
@@ -637,7 +686,7 @@ export function Room({ id }: { id: string }) {
                 </div>
               ) : (
                 <p className="font-led led-text text-[1.7rem] leading-none sm:truncate sm:text-4xl">
-                  {st?.scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "SCORE LINE APPEARS HERE")}
+                  {scoreline ?? (room?.mode === "replay" ? st?.replay?.setup : "SCORE LINE APPEARS HERE")}
                 </p>
               )}
               {st?.replay && (
@@ -941,6 +990,10 @@ export function Room({ id }: { id: string }) {
               muted={muted}
               live={liveStatus === "live"}
               kb={kb}
+              active={tab === "chat"}
+              canMute={!!st?.amHost && room?.mode === "host"}
+              roomId={id}
+              toast={toast.show}
             />
           </div>
         </div>
@@ -958,20 +1011,36 @@ export function Room({ id }: { id: string }) {
             ["chat", "Dugout", "b2/megaphone"],
           ] as const
         ).map(([k, label, art]) => {
-          const badge = k === "chat" && tab !== "chat" && unread > 0 ? String(unread > 9 ? "9+" : unread) : k === "play" && tab !== "play" && open && !myPick ? "!" : null;
+          // the host's thumb bar lives on Play: when a call needs the host, the Play tab says what to tap
+          const hostNeed =
+            st?.amHost && room?.mode === "host" && moment
+              ? moment.state === "open"
+                ? "LOCK"
+                : moment.state === "locked" || moment.state === "pending"
+                  ? "RESULT"
+                  : null
+              : null;
+          const badge =
+            k === "chat" && tab !== "chat" && unread > 0
+              ? String(unread > 9 ? "9+" : unread)
+              : k === "play" && tab !== "play" && hostNeed
+                ? hostNeed
+                : k === "play" && tab !== "play" && open && !myPick
+                  ? "!"
+                  : null;
           return (
             <button
               key={k}
               onClick={() => setTab(k)}
               aria-current={tab === k ? "page" : undefined}
-              aria-label={badge ? `${label} (${k === "chat" ? `${unread} new` : "a call is open"})` : label}
+              aria-label={badge ? `${label} (${k === "chat" ? `${unread} new` : badge === "LOCK" ? "lock the call" : badge === "RESULT" ? "call the result" : "a call is open"})` : label}
               className={`relative flex h-12 flex-col items-center justify-center rounded-xl text-[12px] font-extrabold leading-none transition-all ${
                 tab === k ? "bg-orange text-ink shadow-[0_3px_0_var(--shadow)]" : "text-on-muted active:bg-stage-3"
               }`}
             >
               <Art src={art} className={`h-6 w-6 ${tab === k ? "" : "opacity-80"}`} />
               <span className="mt-0.5">{label}</span>
-              {badge && <span className={`ra-badge ${badge === "!" ? "ra-nudge" : ""}`}>{badge}</span>}
+              {badge && <span className={`ra-badge ${badge === "!" || badge === "LOCK" || badge === "RESULT" ? "ra-nudge" : ""} ${badge.length > 2 ? "!w-auto !px-1.5 text-[10px]" : ""}`}>{badge}</span>}
             </button>
           );
         })}
@@ -1093,6 +1162,10 @@ function ChatBox({
   muted,
   live,
   kb,
+  active,
+  canMute,
+  roomId,
+  toast,
 }: {
   chat: ChatLine[];
   now: number;
@@ -1106,8 +1179,13 @@ function ChatBox({
   muted: boolean;
   live: boolean;
   kb: boolean;
+  active: boolean;
+  canMute: boolean;
+  roomId: string;
+  toast: (t: string, tone?: "ink" | "red" | "mint") => void;
 }) {
   const [text, setText] = useState("");
+  const [muteFor, setMuteFor] = useState<string | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
   const [below, setBelow] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -1129,6 +1207,23 @@ function ChatBox({
     } else setBelow((n) => n + added);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible.length]);
+
+  // phones: the Dugout was hidden while lines arrived; land on the newest when it opens
+  useEffect(() => {
+    const el = listRef.current;
+    if (!active || !el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      atBottom.current = true;
+      setBelow(0);
+    });
+  }, [active]);
+
+  async function muteUser(uid: string) {
+    setMuteFor(null);
+    const r = await api(`/api/rooms/${roomId}/host`, { action: "mute", userId: uid, minutes: 10 });
+    toast(r.ok ? `${nameOf(uid)} is muted for 10 minutes` : (r.data as { error?: string }).error ?? "Mute failed", r.ok ? "mint" : "red");
+  }
 
   // keyboard opened: keep the newest lines in view above it
   useEffect(() => {
@@ -1193,13 +1288,28 @@ function ChatBox({
               <div
                 className={`max-w-[78%] rounded-2xl border-2 border-ink px-3 py-1.5 text-ink shadow-[0_2px_0_var(--shadow)] ${l.from === meId ? "rounded-br-sm bg-orange" : "rounded-bl-sm bg-paper"}`}
               >
-                {l.from !== meId && (
-                  <p className="text-[11px] font-extrabold text-orange-d">
-                    {nameOf(l.from)}
-                    {l.from.startsWith("bot_") && <BotTag />}
-                  </p>
-                )}
+                {l.from !== meId &&
+                  (canMute && !l.from.startsWith("bot_") ? (
+                    <button
+                      type="button"
+                      className="-my-1 flex min-h-7 items-center gap-1 text-[11px] font-extrabold text-orange-d"
+                      aria-label={`${nameOf(l.from)}: host options`}
+                      onClick={() => setMuteFor((v) => (v === l.id ? null : l.id))}
+                    >
+                      <bdi>{nameOf(l.from)}</bdi> <span aria-hidden>▾</span>
+                    </button>
+                  ) : (
+                    <p className="text-[11px] font-extrabold text-orange-d">
+                      <bdi>{nameOf(l.from)}</bdi>
+                      {l.from.startsWith("bot_") && <BotTag />}
+                    </p>
+                  ))}
                 <p className="break-words text-sm">{l.text}</p>
+                {muteFor === l.id && (
+                  <button type="button" className="key key-sm mt-1.5 !min-h-9 !bg-red !text-paper" onClick={() => muteUser(l.from)}>
+                    Mute 10 min
+                  </button>
+                )}
               </div>
             </div>
           ),
@@ -1285,4 +1395,9 @@ function ShareCalled({ label, room, id, toast }: { label: string; room: string; 
       Brag: I called it
     </button>
   );
+}
+
+/** Phone score bar: "368 & 33/1 (11 ov)" → "368 & 33/1" so both teams fit on one line. */
+function shortScore(score?: string) {
+  return (score || "-").replace(/\s*\([^)]*\)/g, "").trim() || "-";
 }

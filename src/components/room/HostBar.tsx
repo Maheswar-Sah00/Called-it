@@ -130,11 +130,21 @@ export function HostBar({
     return () => clearInterval(t);
   }, [lockAt]);
   const left = lockAt ? Math.max(0, Math.ceil((lockAt - now) / 1000)) : null;
+  // Timed call: the server already refuses late calls; at 0 we lock it for everyone and move on to the result.
+  const autoLocked = useRef<string | null>(null);
+  useEffect(() => {
+    if (left !== 0 || !m || m.state !== "open" || busy || autoLocked.current === m.mid) return;
+    autoLocked.current = m.mid;
+    void act("lock", {}, "locked", "locked");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [left, m?.mid, m?.state, busy]);
 
   const tally = m && st.tally?.mid === m.mid ? st.tally : null;
   const players = Object.keys(st.names ?? {}).filter((u) => u !== st.room.hostId && !u.startsWith("bot_")).length;
   const settled = m?.state === "settled" && st.lastResult?.mid === m.mid ? st.lastResult : null;
-  const customOk = q.trim().length > 0 && labels.filter((l) => l.trim()).length >= 2;
+  const filled = labels.map((l) => l.trim().toLowerCase()).filter(Boolean);
+  const dupAnswers = new Set(filled).size !== filled.length;
+  const customOk = q.trim().length > 0 && filled.length >= 2 && !dupAnswers;
 
   async function act(action: string, extra: Record<string, unknown>, optimistic: Opt, next: Phase | null) {
     if (busy === action) return;
@@ -306,7 +316,7 @@ export function HostBar({
               Back
             </button>
             <button className="key flex-1 !min-h-12 !py-0 text-base" disabled={!customOk || busy === "open"}>
-              {customOk ? "Go: open calls" : "Question + 2 answers"}
+              {customOk ? "Go: open calls" : dupAnswers ? "Answers must differ" : "Question + 2 answers"}
             </button>
           </div>
         </form>

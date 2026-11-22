@@ -329,15 +329,43 @@ export type RoomState = {
 };
 
 /** Words and patterns blocked before delivery (betting spam, off-app contact). */
+/**
+ * Room rules. Tuned for match banter: "I bet Kohli hits a six" and "what are the odds" are fine;
+ * betting promotion, links, phone numbers and off-app invites are not.
+ */
 export const BLOCK_PATTERNS: { re: RegExp; reason: string }[] = [
-  { re: /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|in|io|net|xyz|bet|app|link|top)\b)/i, reason: "Links are blocked in match rooms" },
-  { re: /(\+?\d[\d\s-]{8,}\d)/, reason: "Phone numbers are blocked" },
-  { re: /\b(bet|betting|satta|odds|tip(s|ster)?|fixed match|session rate|lagai|khai|1xbet|dafabet|stake\.com)\b/i, reason: "Betting talk is blocked" },
-  { re: /(t\.me\/|telegram|wa\.me|whatsapp group)/i, reason: "Off-app invites are blocked" },
+  {
+    re: /(https?:\/\/|www\.|bit\.ly|t\.co\/|\b[a-z0-9-]{2,}\.(com|in|io|net|org|xyz|bet|app|link|top|cc|live|vip|me|co|ly|club|site|online|win|pro|store|shop)\b)/i,
+    reason: "Links are blocked in match rooms",
+  },
+  { re: /(^|[^\d])(\+?91)?[6-9]\d{9}(?!\d)/, reason: "Phone numbers are blocked" },
+  {
+    re: /(betting|satta|सट्टा|khaiwal|khaiwaal|bookie|fixed match|match fix|session rate|lagai khai|khai lagai|book ?id|betting id|cricket id|online id|\bid (chahiye|lelo|le lo|bano)|1xbet|dafabet|stake\.com|parimatch|melbet|bet365|betway|10cric|sure ?shot|100 ?% ?(sure|win|fix)|paid tips|tipster|bet (karo|lagao|laga|lagaye)|place (a |your )?bets?)/i,
+    reason: "Betting talk is blocked",
+  },
+  { re: /(t\.me\/|telegram|wa\.me|whatsapp group|join (my )?channel|insta ?@|dm (me )?for)/i, reason: "Off-app invites are blocked" },
 ];
 
+// Look-alike letters people use to dodge filters (Cyrillic and Greek).
+const CONFUSABLE: Record<string, string> = {
+  а: "a", е: "e", о: "o", р: "p", с: "c", у: "y", х: "x", ѕ: "s", і: "i", ј: "j", к: "k", м: "m", т: "t", н: "h", в: "b", ԁ: "d", ӏ: "l",
+  α: "a", ε: "e", ο: "o", ρ: "p", τ: "t", κ: "k", ι: "i", ν: "v",
+};
+
+function normalise(text: string) {
+  const base = text
+    .normalize("NFKC")
+    .replace(/[\p{Cf}]/gu, "")
+    .toLowerCase()
+    .replace(/[Ͱ-ϿЀ-ӿ]/g, (c) => CONFUSABLE[c] ?? c);
+  // "s a t t a", "s.a.t.t.a", "9.8.7.6…": join runs of single characters split by spaces or dots
+  return base.replace(/(?:(?<![\p{L}\p{N}])[\p{L}\p{N}][\s.\-_*]+){2,}[\p{L}\p{N}](?![\p{L}\p{N}])/gu, (m) => m.replace(/[\s.\-_*]+/g, ""));
+}
+
 export function blockReason(text: string): string | null {
-  for (const p of BLOCK_PATTERNS) if (p.re.test(text)) return p.reason;
+  const n = normalise(text);
+  const digits = n.replace(/(\d)[\s.\-()]+(?=\d)/g, "$1");
+  for (const p of BLOCK_PATTERNS) if (p.re.test(n) || (p.reason.startsWith("Phone") && p.re.test(digits))) return p.reason;
   return null;
 }
 

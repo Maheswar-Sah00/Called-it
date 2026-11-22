@@ -39,8 +39,20 @@ type EspnEvent = {
 };
 
 function normalise(sport: Sport, league: string, e: EspnEvent): LiveMatch {
-  const paused = /(stumps|lunch|tea|drinks|innings break|rain|bad light|delayed|interrupted|half ?time|scheduled to begin)/i.test(`${e.summary ?? ""} ${e.fullStatus?.type?.description ?? ""}`);
-  const st = e.status === "in" ? "live" : e.status === "pre" ? "soon" : "done";
+  const statusText = [
+    e.summary,
+    e.fullStatus?.longSummary,
+    e.fullStatus?.summary,
+    e.fullStatus?.type?.description,
+    e.fullStatus?.type?.detail,
+    e.fullStatus?.type?.shortDetail,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const paused = /\b(stumps|lunch|tea|drinks|innings break|rain|bad light|delayed|interrupted|half ?time)\b/i.test(statusText);
+  // ESPN sometimes marks a match "in" before the first ball ("Match scheduled to begin at 08:00"): that's not live yet
+  const notStarted = /\b(scheduled to begin|yet to begin|match starts|toss (?:at|delayed))\b/i.test(statusText);
+  const st = e.status === "in" && !notStarted ? "live" : e.status === "pre" || (e.status === "in" && notStarted) ? "soon" : "done";
   const teams = (e.competitors ?? []).slice(0, 2).map((c) => ({
     name: c.displayName || c.name || c.abbreviation || "TBC",
     abbr: c.abbreviation || (c.displayName ?? "").slice(0, 3).toUpperCase(),

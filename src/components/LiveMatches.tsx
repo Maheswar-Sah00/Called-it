@@ -10,7 +10,13 @@ export const FEED_TABS: (Sport | "all")[] = ["all", "cricket", "football", "tenn
 export const HAS_FEED = new Set<Sport>(["cricket", "football", "tennis", "basketball", "hockey", "f1"]);
 
 export function useLive(sport: Sport | "all", enabled = true) {
+  return useLiveFeed(sport, enabled).matches;
+}
+
+/** Matches plus whether the last load failed (so lists can say so instead of pulsing forever). */
+export function useLiveFeed(sport: Sport | "all", enabled = true) {
   const [matches, setMatches] = useState<LiveMatch[] | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!enabled) return;
     let stop = false;
@@ -26,17 +32,24 @@ export function useLive(sport: Sport | "all", enabled = true) {
       /* private mode */
     }
     setMatches(remembered);
+    setFailed(false);
     const load = () =>
-      api<{ matches: LiveMatch[] }>(`/api/live?sport=${sport}`).then((r) => {
-        if (!stop && r.ok) {
+      api<{ matches: LiveMatch[] }>(`/api/live?sport=${sport}`)
+        .catch(() => ({ ok: false as const, data: { matches: [] as LiveMatch[] } }))
+        .then((r) => {
+          if (stop) return;
+          if (!r.ok || !Array.isArray(r.data?.matches)) {
+            setFailed(true);
+            return;
+          }
+          setFailed(false);
           setMatches(r.data.matches);
           try {
             localStorage.setItem(`ci-live-${sport}`, JSON.stringify({ at: Date.now(), m: r.data.matches }));
           } catch {
             /* full or blocked */
           }
-        }
-      });
+        });
     load();
     const t = setInterval(load, 30_000);
     return () => {
@@ -44,7 +57,7 @@ export function useLive(sport: Sport | "all", enabled = true) {
       clearInterval(t);
     };
   }, [sport, enabled]);
-  return matches;
+  return { matches, failed };
 }
 
 function when(m: LiveMatch) {
@@ -138,19 +151,20 @@ export function LiveBrowser({
   const [picked, setSport] = useState<Sport | "all">(initialSport);
   const sport = fixedSport ?? picked;
   const [q, setQ] = useState("");
-  const matches = useLive(sport);
-  const shown = useMemo(() => {
+  const [showAll, setShowAll] = useState(false);
+  const { matches, failed } = useLiveFeed(sport);
+  const found = useMemo(() => {
     const s = q.trim().toLowerCase();
-    const list = (matches ?? []).filter((m) => !s || `${m.title} ${m.league} ${m.teams.map((t) => t.abbr).join(" ")}`.toLowerCase().includes(s));
-    return limit ? list.slice(0, limit) : list;
-  }, [matches, q, limit]);
+    return (matches ?? []).filter((m) => !s || `${m.title} ${m.league} ${m.teams.map((t) => t.abbr).join(" ")}`.toLowerCase().includes(s));
+  }, [matches, q]);
+  const shown = limit && !showAll ? found.slice(0, limit) : found;
   const liveCount = (matches ?? []).filter((m) => m.status === "live").length;
 
   return (
     <div>
       <div className={`scroll-thin -mx-1 flex snap-x gap-2 overflow-x-auto overscroll-x-contain px-1 pb-1 ${fixedSport ? "hidden" : ""}`}>
         {FEED_TABS.map((t) => (
-          <button key={t} className="chip min-h-11 shrink-0 snap-start text-sm" data-on={sport === t} onClick={() => setSport(t)}>
+          <button key={t} className="chip min-h-11 min-w-11 shrink-0 snap-start justify-center text-sm" data-on={sport === t} onClick={() => setSport(t)}>
             {t === "all" ? "All sports" : t === "hockey" ? "Ice hockey" : SPORT_LABEL[t]}
           </button>
         ))}
@@ -160,7 +174,12 @@ export function LiveBrowser({
         <p className={`mt-1.5 text-xs font-bold ${compact ? "text-muted" : "text-on-muted"}`}>{matches ? `${liveCount} live now · ${matches.length - liveCount} starting soon` : "Loading matches…"}</p>
       </div>
       <div className={`mt-3 grid grid-cols-[minmax(0,1fr)] gap-3 ${compact ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
-        {matches === null &&
+        {matches === null && failed && (
+          <p className={`rounded-2xl border-2 border-dashed p-5 text-sm sm:col-span-full ${compact ? "border-ink/25 text-muted" : "border-line text-on-muted"}`}>
+            Couldn&apos;t load the live matches. Retrying… You can still name your own match.
+          </p>
+        )}
+        {matches === null && !failed &&
           Array.from({ length: compact ? 3 : 6 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
         {matches && shown.length === 0 && (
           <p className={`rounded-2xl border-2 border-dashed p-5 text-sm sm:col-span-full ${compact ? "border-ink/25 text-muted" : "border-line text-on-muted"}`}>
@@ -171,6 +190,16 @@ export function LiveBrowser({
           <MatchRow key={m.sport + m.id} m={m} selected={selectedId === m.id} onPick={onPick} />
         ))}
       </div>
+      {limit && !showAll && found.length > limit && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p className={`text-xs font-bold ${compact ? "text-muted" : "text-on-muted"}`}>
+            Showing {limit} of {found.length}. Search to narrow.
+          </p>
+          <button type="button" className="chip min-h-11 text-sm" onClick={() => setShowAll(true)}>
+            Show all {found.length}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

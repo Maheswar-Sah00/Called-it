@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AVATARS } from "@/lib/game";
 import { Art, Avatar } from "./ui";
+
+/** Same cleaning as the server: no control or invisible format characters, 24 whole characters. */
+export function cleanNick(n: string) {
+  return Array.from(n.replace(/[\p{Cc}\p{Cf}<>]/gu, "").replace(/\s+/g, " ").trim())
+    .slice(0, 24)
+    .join("")
+    .trim();
+}
 
 /** Nickname + avatar. No sign-up, no email. */
 export function JoinSheet({
@@ -20,12 +28,18 @@ export function JoinSheet({
 }) {
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState<string>(AVATARS[0]);
-  const valid = name.trim().length >= 1;
+  const clean = cleanNick(name);
+  const valid = clean.length >= 1;
+  // in-flight guard: React state lags a fast double tap, a ref doesn't
+  const sending = useRef(false);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (valid && !busy) onJoin(name.trim(), avatar);
+        if (!valid || busy || sending.current) return;
+        sending.current = true;
+        setTimeout(() => (sending.current = false), 1500);
+        onJoin(clean, avatar);
       }}
     >
       <div className="flex items-center gap-3 pr-12">

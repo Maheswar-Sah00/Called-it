@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /** One piece of art from /public/art, e.g. "b3/pumped". */
 export function Art({
@@ -130,19 +130,42 @@ export function Avatar({ id, size = 36, ring = false, className = "" }: { id?: s
 }
 
 export function Modal({ open, onClose, children, wide = false }: { open: boolean; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const sheetRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const k = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("keydown", k);
     // lock the page behind the sheet so swipes never scroll the landing underneath
     const html = document.documentElement;
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
+    // Phone back button closes the sheet instead of leaving the site: push one history entry
+    // (keeping Next's own state so the router is happy) and close when it is popped.
+    const token = `m${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+    try {
+      window.history.pushState({ ...(window.history.state ?? {}), ciModal: token }, "");
+    } catch {}
+    const onPop = () => {
+      if ((window.history.state as { ciModal?: string } | null)?.ciModal !== token) closeRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    // desktop: move focus into the sheet; give it back on close
+    const before = document.activeElement as HTMLElement | null;
+    if (window.matchMedia?.("(pointer: fine)").matches) sheetRef.current?.focus({ preventScroll: true });
     return () => {
       window.removeEventListener("keydown", k);
+      window.removeEventListener("popstate", onPop);
       html.style.overflow = prev;
+      // closed with ×, Escape or the backdrop: drop the entry we pushed so Back needs one press.
+      // (If we navigated away, the current entry isn't ours and we leave history alone.)
+      try {
+        if ((window.history.state as { ciModal?: string } | null)?.ciModal === token) window.history.back();
+      } catch {}
+      if (before && document.contains(before)) before.focus?.({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div
@@ -150,11 +173,13 @@ export function Modal({ open, onClose, children, wide = false }: { open: boolean
       onClick={onClose}
     >
       <div
-        className={`rise brut-lg modal-sheet relative max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-[22px] bg-paper p-5 pt-6 text-ink sm:max-h-[92vh] sm:p-6 ${wide ? "max-w-2xl" : "max-w-md"}`}
+        className={`rise brut-lg modal-sheet relative outline-none max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-[22px] bg-paper p-5 pt-6 text-ink sm:max-h-[92vh] sm:p-6 ${wide ? "max-w-2xl" : "max-w-md"}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal
         data-scroll
+        ref={sheetRef}
+        tabIndex={-1}
       >
         <div className="absolute inset-x-0 top-0 h-2 rounded-t-[19px] bg-[repeating-linear-gradient(90deg,var(--orange)_0_18px,var(--yellow)_18px_36px)]" />
         <button onClick={onClose} className="key key-paper key-sm !absolute right-3 top-4 z-20 !h-11 !w-11 !p-0 text-xl sm:right-4 sm:top-5" aria-label="Close">

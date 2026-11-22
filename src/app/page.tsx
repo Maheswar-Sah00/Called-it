@@ -6,7 +6,7 @@ import { Art, Brand, Faq, Pitch, Wordmark } from "@/components/ui";
 import { StartRoom } from "@/components/StartRoom";
 import { HeroScoreboard } from "@/components/HeroScoreboard";
 import { ThemeToggle } from "@/components/Theme";
-import { LiveBrowser, MatchRow, MatchTicket, ScoreTicker, useLive } from "@/components/LiveMatches";
+import { LiveBrowser, MatchRow, MatchTicket, ScoreTicker, useLiveFeed } from "@/components/LiveMatches";
 
 const FAQS = [
   { q: "Is this betting?", a: "No. Called It is points only, never money. No stakes, no wallets, no odds. Betting talk, links and phone numbers are blocked before they reach the room." },
@@ -48,7 +48,7 @@ export default function Home() {
   const [sport, setSport] = useState<Sport | undefined>();
   const [match, setMatch] = useState<LiveMatch | null>(null);
   const [allXI, setAllXI] = useState(false);
-  const featured = useLive("all");
+  const { matches: featured, failed: feedFailed } = useLiveFeed("all");
   const liveNow = (featured ?? []).filter((m) => m.status === "live");
   // phone thumb bar: only while none of hero, match list or footer (each has its own CTA) is on screen
   const heroRef = useRef<HTMLElement>(null);
@@ -132,8 +132,8 @@ export default function Home() {
             href="#live"
             className="mx-auto mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-sm text-on-muted transition hover:text-orange sm:mt-6"
           >
-            <span className="live-dot" />
-            <b className="text-on">{featured ? liveNow.length : "…"}</b> matches live right now
+            {liveNow.length > 0 && <span className="live-dot" />}
+            <b className="text-on">{featured ? liveNow.length : feedFailed ? "–" : "…"}</b> {liveNow.length === 1 ? "match" : "matches"} live right now
             <span aria-hidden className="font-bold">
               ↓
             </span>
@@ -153,13 +153,29 @@ export default function Home() {
           <p className="max-w-sm text-[15px] text-on-muted sm:text-base">Real matches on air right now. Tap yours to open a room.</p>
         </div>
         <div className="mt-5 flex flex-col gap-3 sm:hidden">
-          {featured === null && Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
+          {featured === null && !feedFailed && Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[7.5rem] animate-pulse rounded-2xl border-2 border-line bg-stage-3/60" />)}
+          {((featured === null && feedFailed) || (featured && featured.length === 0)) && (
+            <div className="rounded-2xl border-2 border-dashed border-line p-5 text-sm text-on-muted">
+              <p>{feedFailed && !featured ? "Couldn't load the live matches. Retrying…" : "Nothing live right now."} Name your own match and keep the score yourself.</p>
+              <button className="key key-sm mt-3" onClick={() => start("other")}>
+                Name your own match
+              </button>
+            </div>
+          )}
           {(liveNow.length ? liveNow : featured ?? []).slice(0, 4).map((m) => (
             <MatchRow key={m.sport + m.id} m={m} onPick={(x) => start(x.sport, x)} />
           ))}
         </div>
         <div className="mt-10 hidden gap-x-4 gap-y-6 sm:grid sm:grid-cols-3 lg:grid-cols-5">
-          {featured === null &&
+          {((featured === null && feedFailed) || (featured && featured.length === 0)) && (
+            <div className="col-span-full rounded-2xl border-2 border-dashed border-line p-6 text-on-muted">
+              <p>{feedFailed && !featured ? "Couldn't load the live matches. Retrying…" : "Nothing live right now."} Name your own match and keep the score yourself.</p>
+              <button className="key key-sm mt-3" onClick={() => start("other")}>
+                Name your own match
+              </button>
+            </div>
+          )}
+          {featured === null && !feedFailed &&
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="brut h-[17rem] animate-pulse rounded-[22px] bg-paper/70" style={{ transform: `rotate(${[-2, 1.5, -1, 2, -1.5][i]}deg)` }} />
             ))}

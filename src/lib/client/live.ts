@@ -26,7 +26,7 @@ export type LiveEvent =
   | { kind: "participants"; count: number }
   | { kind: "metadata"; data: Record<string, string> }
   | { kind: "status"; status: "connecting" | "live" | "offline"; detail?: string }
-  | { kind: "muted"; me: boolean }
+  | { kind: "muted"; me: boolean; ms?: number }
   | { kind: "blocked"; reason: string };
 
 export type LogLine = { at: number; api: string; detail: string; ms?: number };
@@ -145,6 +145,7 @@ export async function joinLive(opts: {
   emit({ kind: "status", status: "connecting" });
 
   const hid = `ci-${opts.channelId}-${++joinSeq}`;
+  let entered = false;
   holds.set(opts.channelId, (holds.get(opts.channelId) ?? 0) + 1);
   s.NCEngine.addMessageHandler(
     hid,
@@ -188,8 +189,8 @@ export async function joinLive(opts: {
       onParticipantMuted({ info }) {
         if (info.channelId !== opts.channelId) return;
         const me = info.userIdList.includes(opts.userId);
-        if (me) emit({ kind: "muted", me: true });
-        log("onParticipantMuted", `${info.userIdList.length} muted for ${Math.round(info.durationTime / 60)} min`);
+        if (me) emit({ kind: "muted", me: true, ms: info.durationTime });
+        log("onParticipantMuted", `${info.userIdList.length} muted for ${Math.round(info.durationTime / 60_000)} min`);
       },
     }),
   );
@@ -197,7 +198,13 @@ export async function joinLive(opts: {
     hid,
     new s.ConnectionStatusHandler({
       onConnectionStatusChanged(e) {
-        log("onConnectionStatusChanged", String((e as { status?: unknown }).status ?? ""));
+        const st = Number((e as { status?: unknown }).status);
+        log("onConnectionStatusChanged", String(st));
+        if (!entered) return; // the first connect is reported by joinLive itself
+        // 0 connected, 1 connecting; 2/3/4/7/8/13 = dropped. The SDK reconnects and walks back into the channel.
+        if (st === 0) emit({ kind: "status", status: "live" });
+        else if (st === 1) emit({ kind: "status", status: "connecting" });
+        else if ([2, 3, 4, 7, 8, 13].includes(st)) emit({ kind: "status", status: "offline", detail: `connection ${st}` });
       },
     }),
   );
@@ -219,8 +226,17 @@ export async function joinLive(opts: {
     emit({ kind: "status", status: "offline", detail: `enter ${er.code}` });
     throw new Error(`enter failed ${er.code}`);
   }
+  entered = true;
   emit({ kind: "status", status: "live" });
   if (er.data) emit({ kind: "participants", count: er.data.participantCount });
+
+  // Leave the channel when the tab closes so friends' "N IN" drops; walk back in if the page is restored.
+  const onHide = () => void ch.exitChannel().catch(() => null);
+  const onShow = (ev: PageTransitionEvent) => {
+    if (ev.persisted) void ch.enterChannel({ messageCount: 10 }).catch(() => null);
+  };
+  window.addEventListener("pagehide", onHide);
+  window.addEventListener("pageshow", onShow);
 
   ch.getMetadata()
     .then((m) => {
@@ -253,6 +269,8 @@ export async function joinLive(opts: {
       if (r.isOk && r.data) emit({ kind: "msg", msg: toMsg(r.data) });
     },
     async leave() {
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("pageshow", onShow);
       s.NCEngine.removeMessageHandler?.(hid);
       s.NCEngine.removeOpenChannelHandler?.(hid);
       s.NCEngine.removeConnectionStatusHandler?.(hid);

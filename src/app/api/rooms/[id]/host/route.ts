@@ -49,6 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           q = str(b.q, 80).trim();
           const labels = (Array.isArray(b.labels) ? b.labels : []).map((l) => str(l, 24).trim()).filter(Boolean).slice(0, 4);
           if (!q || labels.length < 2) return { error: "Write a question and at least two answers" };
+          if (new Set(labels.map((l) => l.toLowerCase())).size !== labels.length) return { error: "Each answer must be different" };
           options = labels.map((label, i) => ({ id: `o${i}`, label, points: 10 }));
         }
         const secs = Number(b.seconds);

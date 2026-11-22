@@ -121,7 +121,7 @@ export function HostPanel({
           </div>
           {preset === "custom" && (
             <div className="rise mt-3 grid gap-2">
-              {(!q.trim() || labels.filter((l) => l.trim()).length < 2) && (
+              {(!q.trim() || new Set(labels.map((l) => l.trim().toLowerCase()).filter(Boolean)).size < Math.max(2, labels.filter((l) => l.trim()).length)) && (
                 <p className="text-xs font-bold text-orange-d">Write the question and at least two answers.</p>
               )}
               <input className="input" placeholder="Your question, e.g. Does Kohli reach 50?" value={q} maxLength={80} onChange={(e) => setQ(e.target.value)} />
@@ -151,7 +151,7 @@ export function HostPanel({
           <input className="input mt-2 !py-2 text-sm" placeholder="e.g. IND 182/4 · 18.2 ov" value={score} maxLength={60} onChange={(e) => setScore(e.target.value)} />
           <button
             className="key mt-5 w-full text-lg"
-            disabled={!!busy || (preset === "custom" && (!q.trim() || labels.filter((l) => l.trim()).length < 2))}
+            disabled={!!busy || (preset === "custom" && (!q.trim() || new Set(labels.map((l) => l.trim().toLowerCase()).filter(Boolean)).size < Math.max(2, labels.filter((l) => l.trim()).length)))}
             onClick={() =>
               act("open", preset === "custom" ? { q, labels, seconds: secs } : { preset, seconds: secs })
             }
