@@ -43,7 +43,7 @@ export function botCall(options: Option[], botId: string): string {
 }
 
 export function botLine(outcome: string, detail?: string): string | null {
-  if (outcome === "W" && detail?.includes("Yadav")) return "SKY WHAT A CATCH!!!";
+  if (outcome === "W" && detail?.includes("Yadav") && detail.includes("Miller")) return "SKY WHAT A CATCH!!!";
   if (outcome === "W") return "GONE!! Called it";
   if (outcome === "6") return "That's out of the ground";
   if (outcome === "4") return "Four! Pressure's back on";

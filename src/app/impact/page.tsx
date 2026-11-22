@@ -66,7 +66,7 @@ export default function ImpactPage() {
             </div>
           </div>
           <Link href="/try" className="key min-h-12 w-full text-base sm:w-auto">
-            Try the 60-second demo
+            Try the 3-minute demo
           </Link>
         </div>
       </div>

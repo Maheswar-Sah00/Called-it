@@ -19,8 +19,11 @@ import { createOpenChannel, destroyOpenChannels, sendToRoom, setRoomMetadata } f
 import {
   callIfOpen,
   getJSON,
+  hget,
   hgetall,
   hset,
+  pushList,
+  readList,
   incr,
   lease,
   patchMoment,
@@ -52,8 +55,23 @@ type ReplayBall = {
 };
 const REPLAY = replayData as { title: string; setup: string; target: number; balls: ReplayBall[]; source: string };
 
+/**
+ * The demo starts at Bumrah's 18th over (SA need 22 off 18): the Jansen wicket, Arshdeep's
+ * squeeze and Hardik's final over with the Suryakumar catch, in about three minutes.
+ */
+const REPLAY_START = REPLAY.balls.findIndex((b) => b.over === 17);
+const REPLAY_FROM = REPLAY_START > 0 ? REPLAY_START : 0;
+const REPLAY_TOTAL = REPLAY.balls.length - REPLAY_FROM;
+const REPLAY_SETUP = (() => {
+  const before = REPLAY_FROM > 0 ? REPLAY.balls[REPLAY_FROM - 1].score : "147/4";
+  const runs = Number(before.split("/")[0]);
+  const left = REPLAY.balls.filter((b, i) => i >= REPLAY_FROM && b.outcome !== "WD" && b.outcome !== "NB").length;
+  return `SA ${before} · need ${REPLAY.target - runs} off ${left}. Final ${Math.ceil(left / 6)} overs`;
+})();
+
 const K = {
   room: (id: string) => `room:${id}`,
+  results: (id: string) => `room:${id}:results`,
   moment: (id: string) => `room:${id}:m`,
   calls: (id: string, mid: string) => `room:${id}:c:${mid}`,
   names: (id: string) => `room:${id}:names`,
@@ -69,10 +87,10 @@ const K = {
   hostLease: (id: string) => `room:${id}:hostop`,
 };
 
-// Replay timing (ms). Long enough to call, short enough for a 60-second judge demo.
-const OPEN_MS = 8000;
-const REVIEW_MS = 2200;
-const GAP_MS = 3200;
+// Replay timing (ms). Long enough to read the card and call, short enough for a three-minute demo.
+const OPEN_MS = 6500;
+const REVIEW_MS = 2000;
+const GAP_MS = 2600;
 
 export function newRoomId() {
   return randomBytes(4).toString("base64url").replace(/[^a-zA-Z0-9]/g, "k").slice(0, 6).toLowerCase();
@@ -105,13 +123,13 @@ export async function createRoom(opts: {
   await setJSON(K.room(id), room);
   await rememberName(id, opts.hostId, opts.hostName, opts.hostAvatar);
   if (opts.mode === "replay") {
-    await setJSON(K.replay(id), { index: 0, phase: "idle", nextAt: Date.now() + 6000 });
+    await setJSON(K.replay(id), { index: REPLAY_FROM, phase: "idle", nextAt: Date.now() + 5000 });
   }
   if (!opts.demo) {
     await sadd("impact:rooms", id);
   }
   if (opts.demo) {
-    for (const [botId, botName] of Object.entries(BOT_NAMES)) await hset(K.names(id), botId, botName);
+    await Promise.all(Object.entries(BOT_NAMES).map(([botId, botName]) => hset(K.names(id), botId, botName)));
   }
   return { room, channelMs: r.ms };
 }
@@ -203,46 +221,60 @@ async function tallyOf(roomId: string, mid: string, options: Option[]): Promise<
   return { mid, counts, total: Object.keys(calls).length };
 }
 
-export async function roomState(roomId: string, userId: string | null): Promise<RoomState | null> {
+export async function roomState(roomId: string, userId: string | null, opts: { history?: boolean } = {}): Promise<RoomState | null> {
   const room = await getRoom(roomId);
   if (!room) return null;
   const [m] = await Promise.all([hgetall(K.moment(roomId)), touchRoom(room)]);
-  let moment: RoomState["moment"] = null;
-  let tally: TallyCard | null = null;
-  let myCall: string | null = null;
-  if (m.mid) {
-    const card = JSON.parse(m.card) as MomentCard;
-    moment = { ...card, state: m.state as "open" | "locked" | "pending" | "settled" };
-    tally = await tallyOf(roomId, m.mid, card.options);
-    if (userId) myCall = (await hgetall(K.calls(roomId, m.mid)))[userId] ?? null;
-  }
-  const lastResult = await getJSON<ResultCard>(K.result(roomId));
-  const rp = room.mode === "replay" ? await getJSON<{ index: number; nextAt: number; phase: string }>(K.replay(roomId)) : null;
+  const card = m.mid ? (JSON.parse(m.card) as MomentCard) : null;
+  // every read below is independent: run them side by side (each is a round trip to Redis)
+  const [tally, myCall, lastResult, rp, boardNow, names, huddle, live, history] = await Promise.all([
+    card ? tallyOf(roomId, m.mid, card.options) : Promise.resolve(null),
+    card && userId ? hget(K.calls(roomId, m.mid), userId) : Promise.resolve(null),
+    getJSON<ResultCard>(K.result(roomId)),
+    room.mode === "replay" ? getJSON<{ index: number; nextAt: number; phase: string }>(K.replay(roomId)) : Promise.resolve(null),
+    board(roomId),
+    roomNames(roomId),
+    getJSON<HuddleInfo>(K.huddle(roomId)),
+    room.match ? findMatch(room.match.sport, room.match.id).catch(() => null) : Promise.resolve(null),
+    opts.history && userId ? myHistory(roomId, userId) : Promise.resolve(null),
+  ]);
   const replay =
     room.mode === "replay"
       ? {
-          index: rp?.index ?? 0,
+          index: Math.max(0, (rp?.index ?? REPLAY_FROM) - REPLAY_FROM),
           nextAt: rp?.nextAt ?? 0,
           phase: rp?.phase ?? "idle",
-          total: REPLAY.balls.length,
+          total: REPLAY_TOTAL,
           title: REPLAY.title,
-          setup: REPLAY.setup,
+          setup: REPLAY_SETUP,
         }
       : null;
   return {
     room,
-    moment,
+    moment: card ? { ...card, state: m.state as "open" | "locked" | "pending" | "settled" } : null,
     lastResult,
     tally,
-    board: await board(roomId),
+    board: boardNow,
     myCall,
-    names: await roomNames(roomId),
-    huddle: await getJSON<HuddleInfo>(K.huddle(roomId)),
-    live: room.match ? await findMatch(room.match.sport, room.match.id).catch(() => null) : null,
+    names,
+    huddle,
+    live,
     amHost: !!userId && userId === room.hostId,
     scoreline: m.scoreline || lastResult?.scoreline || null,
     replay,
+    ...(history ? { history } : {}),
   };
+}
+
+/** This player's past results in the room, so a reload keeps the ball strip, the count and the streak. */
+async function myHistory(roomId: string, userId: string) {
+  const results = (await readList<ResultCard>(K.results(roomId), 40)).reverse();
+  const picks = await Promise.all(results.map((r) => hget(K.calls(roomId, r.mid), userId)));
+  const mine: Record<string, string> = {};
+  results.forEach((r, i) => {
+    if (picks[i]) mine[r.mid] = picks[i]!;
+  });
+  return { results, picks: mine };
 }
 
 // ---------- moment lifecycle ----------
@@ -257,6 +289,8 @@ export async function openMoment(
 ) {
   const mid = randomBytes(5).toString("hex");
   const card: MomentCard = { mid, q, options, openAt: Date.now(), lockAt, ball };
+  // demo bots call before the card is visible, so the first tally already shows them
+  if (room.demo) await Promise.all(Object.keys(BOT_NAMES).map((id) => hset(K.calls(room.id, mid), id, botCall(options, id))));
   await setMoment(K.moment(room.id), {
     mid,
     state: "open",
@@ -266,18 +300,11 @@ export async function openMoment(
   });
   const sent = await sendToRoom(room.channelId, MT.Moment, card, { priority: 2 });
   void setRoomMetadata(room.channelId, { phase: "open", mid, q, ...(scoreline ? { score: scoreline } : {}) });
-  if (room.demo) await seedBotCalls(room, card);
-  return { card, ms: sent.ms };
-}
-
-async function seedBotCalls(room: RoomPublic, card: MomentCard) {
-  const ids = Object.keys(BOT_NAMES);
-  for (const id of ids) {
-    const pick = botCall(card.options, id);
-    await hset(K.calls(room.id, card.mid), id, pick);
+  if (room.demo) {
+    const t = await tallyOf(room.id, card.mid, card.options);
+    await sendToRoom(room.channelId, MT.Tally, t, { persist: false });
   }
-  const t = await tallyOf(room.id, card.mid, card.options);
-  await sendToRoom(room.channelId, MT.Tally, t, { persist: false });
+  return { card, ms: sent.ms };
 }
 
 /** A player's call. The Lua script refuses anything after the lock. */
@@ -357,6 +384,7 @@ export async function settle(room: RoomPublic, outcome: string, detail?: string,
     at: Date.now(),
   };
   await setJSON(K.result(room.id), result);
+  await pushList(K.results(room.id), result, 40);
   const r = await sendToRoom(room.channelId, MT.Result, result, { priority: 2 });
   void setRoomMetadata(room.channelId, { phase: "settled", mid: m.mid, ...(result.scoreline ? { score: result.scoreline } : {}) });
   if (room.demo) {
@@ -387,7 +415,9 @@ function needLine(scoreAfter: string, ballIndexAfter: number) {
   const runs = Number(scoreAfter.split("/")[0]);
   const need = REPLAY.target - runs;
   const ballsLeft = REPLAY.balls.filter((b, i) => i >= ballIndexAfter && b.outcome !== "WD" && b.outcome !== "NB").length;
-  return need > 0 ? `SA need ${need} off ${ballsLeft}` : "SA win";
+  if (need <= 0) return "SA win";
+  if (ballsLeft === 0) return `India win by ${need - 1} runs`;
+  return `SA need ${need} off ${ballsLeft}`;
 }
 
 /**
@@ -401,7 +431,7 @@ export async function tick(room: RoomPublic) {
   if (!tickToken) return { acted: false };
   try {
     const st = (await getJSON<{ index: number; phase: string; nextAt: number }>(K.replay(room.id))) ?? {
-      index: 0,
+      index: REPLAY_FROM,
       phase: "idle",
       nextAt: 0,
     };
@@ -460,6 +490,8 @@ function ballNo(index: number) {
     const x = REPLAY.balls[i];
     if (x.over === b.over && x.outcome !== "WD" && x.outcome !== "NB") n++;
   }
+  // a wide or no-ball is the delivery being attempted next, so it carries the next ball number
+  if (b.outcome === "WD" || b.outcome === "NB") n++;
   return Math.min(Math.max(n, 1), 6);
 }
 
@@ -517,4 +549,4 @@ export async function withHostLease<T>(roomId: string, fn: () => Promise<T>): Pr
   }
 }
 
-export const replayInfo = { title: REPLAY.title, setup: REPLAY.setup, balls: REPLAY.balls.length, source: REPLAY.source };
+export const replayInfo = { title: REPLAY.title, setup: REPLAY_SETUP, balls: REPLAY_TOTAL, source: REPLAY.source };

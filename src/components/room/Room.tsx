@@ -127,6 +127,8 @@ export function Room({ id }: { id: string }) {
   const [results, setResults] = useState<ResultCard[]>([]);
   const [stats, setStats] = useState({ cards: 0, chats: 0, forged: 0, blocked: 0 });
   const [retry, setRetry] = useState(0);
+  const historyLoaded = useRef(false);
+  const bestRtt = useRef(Number.POSITIVE_INFINITY);
   const [unread, setUnread] = useState(0);
   const kb = useKeyboardOpen();
   const tabRef = useRef(tab);
@@ -146,11 +148,26 @@ export function Room({ id }: { id: string }) {
   // ---------- state ----------
   const fetchState = useCallback(async () => {
     const t0 = Date.now();
-    const r = await api<State>(`/api/rooms/${id}`);
+    const wantHistory = !historyLoaded.current;
+    const r = await api<State>(`/api/rooms/${id}${wantHistory ? "?history=1" : ""}`);
     if (r.status === 404) return setMissing(true);
     if (!r.ok) return;
     const rtt = Date.now() - t0;
-    offset.current = r.data.serverNow + rtt / 2 - Date.now();
+    // Clock sync: trust the fastest round trip seen (slow ones carry server work and overshoot the lock).
+    bestRtt.current *= 1.03; // let the best sample age, so a slower network still resyncs
+    if (rtt <= bestRtt.current * 1.25) {
+      bestRtt.current = Math.min(bestRtt.current, rtt);
+      offset.current = r.data.serverNow + rtt / 2 - Date.now();
+    }
+    if (wantHistory && r.data.history) {
+      historyLoaded.current = true;
+      const h = r.data.history;
+      setMyCalls((m) => ({ ...h.picks, ...m }));
+      setResults((rs) => {
+        const seen = new Set(rs.map((x) => x.mid));
+        return [...h.results.filter((x) => !seen.has(x.mid)), ...rs].sort((a, b) => a.at - b.at).slice(-40);
+      });
+    } else if (wantHistory) historyLoaded.current = true;
     setSt(r.data);
     // a room with no settled result yet: the very first result that lands deserves its celebration
     if (firstLoad.current && !r.data.lastResult) firstLoad.current = false;
@@ -161,7 +178,7 @@ export function Room({ id }: { id: string }) {
     }
     if (r.data.lastResult) {
       const lr = r.data.lastResult;
-      setResults((rs) => (rs.some((x) => x.mid === lr.mid) ? rs : [...rs, lr].slice(-30)));
+      setResults((rs) => (rs.some((x) => x.mid === lr.mid) ? rs : [...rs, lr].slice(-40)));
     }
   }, [id]);
 
@@ -463,7 +480,7 @@ export function Room({ id }: { id: string }) {
     // if our countdown already hit zero we still ask: the server's clock decides and says how late we were
     buzz(12);
     const prev = myPick;
-    setMyCalls((m) => ({ ...m, [moment.mid]: option }));
+    if (!clientLocked) setMyCalls((m) => ({ ...m, [moment.mid]: option }));
     const r = await api<{ status: string; tally?: TallyCard; at?: number; lockAt?: number }>(`/api/rooms/${id}/call`, { mid: moment.mid, option, tapAt: Date.now() + offset.current });
     if (!r.ok) {
       setMyCalls((m) => {
@@ -535,7 +552,7 @@ export function Room({ id }: { id: string }) {
         <div>
           <Art src="b3/sleep" className="mx-auto w-40" />
           <h1 className="font-arcade mt-4 text-3xl">This room has closed</h1>
-          <p className="mt-2 text-on-muted">Rooms close after a day of quiet. Start a fresh one.</p>
+          <p className="mt-2 text-on-muted">Rooms close after a stretch of quiet (demo rooms after an hour). Start a fresh one.</p>
           <Link href="/" className="key mt-6">
             Back home
           </Link>
@@ -573,8 +590,11 @@ export function Room({ id }: { id: string }) {
                 : "b3/facepalm"
               : "b3/wave"
             : "b3/locked";
-  const phaseLabel = phase === "waiting" ? "WARM-UP" : open ? "CALLS OPEN" : phase === "pending" ? "UNDER REVIEW" : phase === "settled" ? "SETTLED" : "LOCKED";
-  const headline = open
+  const replayDone = room?.mode === "replay" && st?.replay?.phase === "done";
+  const phaseLabel = replayDone ? "FULL TIME" : phase === "waiting" ? "WARM-UP" : open ? "CALLS OPEN" : phase === "pending" ? "UNDER REVIEW" : phase === "settled" ? "SETTLED" : "LOCKED";
+  const headline = replayDone
+    ? "That was the last ball."
+    : open
     ? "Calls are open. Make yours."
     : phase === "pending"
       ? "Under review. Hold your nerve."
@@ -781,7 +801,7 @@ export function Room({ id }: { id: string }) {
                   {open ? (myPick ? "Call in. Switch until the buzzer." : "Tap a key. Calls lock at the buzzer.") : headline}
                 </p>
                 <h2 className="font-arcade mt-0.5 text-xl leading-tight sm:mt-1 sm:text-4xl">
-                  {moment?.q ?? (!room ? "Getting the room ready…" : room.mode === "replay" ? "First ball coming up…" : st?.amHost ? "Ask the room something" : "The host is picking the moment")}
+                  {replayDone ? "FULL TIME" : moment?.q ?? (!room ? "Getting the room ready…" : room.mode === "replay" ? "First ball coming up…" : st?.amHost ? "Ask the room something" : "The host is picking the moment")}
                 </h2>
                 {moment?.ball?.need && <p className="font-led mt-1 text-2xl text-orange-d max-sm:hidden">{moment.ball.need.toUpperCase()}</p>}
 
@@ -892,6 +912,17 @@ export function Room({ id }: { id: string }) {
                     {myCalls[shownResult.mid] === shownResult.outcome && <ShareCalled label={shownResult.label} room={room?.name ?? "the match"} id={id} toast={toast.show} />}
                   </div>
                 )}
+                {room?.mode === "replay" && st?.replay?.phase === "done" && !resultHidden && (
+                  <FullTime
+                    right={rightCount}
+                    called={calledCount}
+                    total={st.replay.total}
+                    points={myPoints}
+                    board={board}
+                    meId={me?.userId}
+                    toast={toast.show}
+                  />
+                )}
                 {delay > 0 && resultHidden && <p className="font-led mt-3 flex items-center gap-1.5 text-lg text-muted"><Art src="b2/lock" className="h-6 w-6" /> SPOILER SHIELD HOLDING THIS RESULT FOR {delay}S</p>}
               </div>
 
@@ -935,7 +966,7 @@ export function Room({ id }: { id: string }) {
                 </p>
               </div>
               <div className="scroll-thin ra-strip mt-2.5 flex gap-2.5 overflow-x-auto pb-2 pt-1">
-                {visibleResults.length === 0 && <p className="text-sm text-on-muted">Every settled moment lands here as a ball: green if you called it.</p>}
+                {visibleResults.length === 0 && <p className="text-sm text-on-muted">Every settled moment lands here as a ball: bright if you called it right, crossed if you missed.</p>}
                 {visibleResults.map((r) => {
                   const pick = myCalls[r.mid];
                   const right = !!pick && pick === r.outcome;
@@ -943,10 +974,15 @@ export function Room({ id }: { id: string }) {
                     <button key={r.mid} type="button" className="group relative shrink-0 outline-none" aria-label={`${r.label}: ${r.detail ?? ""}`}>
                       <div
                         className={`rise grid h-12 w-12 place-items-center rounded-full border-[2.5px] border-ink text-sm font-black shadow-[0_3px_0_var(--shadow)] transition-transform group-hover:-translate-y-1 ${
-                          pick ? (right ? "bg-lime text-ink" : "bg-k-rose text-ink") : "bg-sand text-ink"
+                          pick ? (right ? "bg-lime text-ink" : "bg-k-rose text-ink") : "border-dashed bg-sand text-ink opacity-60"
                         }`}
                       >
                         {short(r.label)}
+                        {pick && !right && (
+                          <span aria-hidden className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-ink bg-red text-[11px] font-black leading-none text-paper">
+                            ✕
+                          </span>
+                        )}
                       </div>
                       <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-44 -translate-x-1/2 rounded-xl border-2 border-ink bg-paper p-2 text-xs text-ink shadow-[0_3px_0_var(--shadow)] group-hover:block group-focus:block">
                         <b>{r.label}</b> · {r.detail ?? ""}
@@ -1380,16 +1416,7 @@ function ShareCalled({ label, room, id, toast }: { label: string; room: string; 
       onClick={async () => {
         const url = `${location.origin}/r/${id}`;
         const text = `I called it! "${label}" in ${room}. Think you can beat me? ${url}`;
-        if (navigator.share) {
-          try {
-            await navigator.share({ title: "I called it", text, url });
-            return;
-          } catch {
-            /* copy instead */
-          }
-        }
-        await navigator.clipboard.writeText(text);
-        toast("Brag copied. Paste it anywhere.", "mint");
+        await shareOrCopy("I called it", text, toast);
       }}
     >
       Brag: I called it
@@ -1400,4 +1427,90 @@ function ShareCalled({ label, room, id, toast }: { label: string; room: string; 
 /** Phone score bar: "368 & 33/1 (11 ov)" → "368 & 33/1" so both teams fit on one line. */
 function shortScore(score?: string) {
   return (score || "-").replace(/\s*\([^)]*\)/g, "").trim() || "-";
+}
+
+/** Native share sheet when there is one; otherwise copy. Cancelling the sheet does nothing. */
+async function shareOrCopy(title: string, text: string, toast: (t: string, tone?: "ink" | "red" | "mint") => void) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text });
+      return;
+    } catch (e) {
+      if ((e as { name?: string })?.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Copied. Paste it anywhere.", "mint");
+  } catch {
+    toast("Couldn't copy. Long-press to select instead.", "red");
+  }
+}
+
+/** End of the replay: the result, your score, the table, and a way to go again. */
+function FullTime({
+  right,
+  called,
+  total,
+  points,
+  board,
+  meId,
+  toast,
+}: {
+  right: number;
+  called: number;
+  total: number;
+  points: number;
+  board: { id: string; name: string; points: number }[];
+  meId?: string;
+  toast: (t: string, tone?: "ink" | "red" | "mint") => void;
+}) {
+  const top = board.slice(0, 3);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const t = setTimeout(() => ref.current?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "center" }), 900);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div ref={ref} className="rise mt-4 scroll-mb-28 rounded-2xl border-2 border-ink bg-yellow p-4 text-ink shadow-[0_3px_0_var(--shadow)] sm:mt-5">
+      <p className="font-led text-xl leading-none">FULL TIME</p>
+      <p className="font-display mt-1 text-xl font-extrabold leading-tight">India win by 7 runs. World champions.</p>
+      <p className="mt-2 text-sm font-bold">
+        You called {right} of {total} right{called < total ? ` (${called} called)` : ""} · {points} pts
+      </p>
+      {top.length > 0 && (
+        <ol className="mt-3 flex flex-col gap-1 text-sm">
+          {top.map((b, i) => (
+            <li key={b.id} className={`flex items-center gap-2 rounded-lg px-2 py-1 ${b.id === meId ? "bg-orange" : "bg-paper/70"}`}>
+              <span className="font-led w-5 text-lg">{i + 1}</span>
+              <bdi className="flex-1 truncate font-bold">{b.name}</bdi>
+              <span className="font-led text-lg">{b.points}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {/* a full page load starts a fresh demo room */}
+        <a href="/try" className="key flex-1 !min-h-12 text-base" onClick={(e) => (e.preventDefault(), location.assign("/try"))}>
+          Play again
+        </a>
+        <button
+          type="button"
+          className="key key-paper flex-1 !min-h-12 text-base"
+          onClick={() =>
+            shareOrCopy(
+              "Called It",
+              `I called ${right} of ${total} balls of the 2024 T20 World Cup final finish on Called It. Beat that: ${location.origin}/try`,
+              toast,
+            )
+          }
+        >
+          Share my score
+        </button>
+      </div>
+      <Link href="/" className="mt-3 block text-center text-sm font-bold underline underline-offset-4">
+        Start a room for a live match
+      </Link>
+    </div>
+  );
 }

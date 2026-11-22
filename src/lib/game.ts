@@ -326,6 +326,8 @@ export type RoomState = {
   /** latest from the live feed when the room follows a real match */
   live?: LiveMatch | null;
   replay?: { index: number; nextAt: number; phase: string; total: number; title: string; setup: string } | null;
+  /** only on ?history=1: this player's earlier results and picks in the room */
+  history?: { results: ResultCard[]; picks: Record<string, string> };
 };
 
 /** Words and patterns blocked before delivery (betting spam, off-app contact). */

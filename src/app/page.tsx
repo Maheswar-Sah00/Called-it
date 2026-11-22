@@ -16,7 +16,7 @@ const FAQS = [
   { q: "My stream is behind my friends'. Spoilers?", a: "Turn on the spoiler shield in the room. It holds back results and chat for you by the delay you pick." },
   { q: "What about DRS and VAR?", a: "The host marks the moment 'under review'. Points wait until the decision is in, so nobody celebrates early." },
   { q: "Which sports work?", a: "Any live sport. Cricket, football, basketball, tennis, badminton, kabaddi, hockey, F1 and esports have ready-made questions. For anything else, type your own." },
-  { q: "Can I try it with nobody online?", a: "Yes. The 60-second demo replays the last five overs of the 2024 T20 World Cup final, ball by ball, with labelled demo bots." },
+  { q: "Can I try it with nobody online?", a: "Yes. The 3-minute demo replays the last three overs of the 2024 T20 World Cup final, ball by ball, with labelled demo bots." },
 ];
 
 /** The eleven Nexconn features Called It uses, laid out as a 4-3-3. */
@@ -125,7 +125,7 @@ export default function Home() {
               Start a room
             </button>
             <a href="/try" className="key key-paper min-h-12 text-base sm:min-h-14 sm:text-lg">
-              Try the 60-second demo
+              Try the 3-minute demo
             </a>
           </div>
           <a

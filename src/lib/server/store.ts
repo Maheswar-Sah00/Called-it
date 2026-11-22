@@ -129,6 +129,42 @@ export async function ztouch(key: string, member: string, score: number) {
   }
 }
 
+export async function hget(key: string, field: string): Promise<string | null> {
+  if (redis) {
+    const v = await redis.hget<string>(key, field);
+    return v === null || v === undefined ? null : String(v);
+  }
+  const h = (memGet<Record<string, string>>(key) ?? {}) as Record<string, string>;
+  return h[field] ?? null;
+}
+
+/** Push a JSON value to the front of a capped list (newest first). */
+export async function pushList(key: string, value: unknown, max: number, ttlSec = 60 * 60 * 24 * 14) {
+  const v = JSON.stringify(value);
+  if (redis) {
+    await redis.lpush(key, v);
+    await redis.ltrim(key, 0, max - 1);
+    await redis.expire(key, ttlSec);
+    return;
+  }
+  const l = (memGet<string[]>(key) ?? []) as string[];
+  mem.kv.set(key, [v, ...l].slice(0, max));
+}
+
+/** Newest first. */
+export async function readList<T>(key: string, n: number): Promise<T[]> {
+  const raw = redis ? ((await redis.lrange(key, 0, n - 1)) as unknown[]) : ((memGet<string[]>(key) ?? []) as string[]).slice(0, n);
+  const out: T[] = [];
+  for (const r of raw) {
+    try {
+      out.push((typeof r === "string" ? JSON.parse(r) : r) as T);
+    } catch {
+      /* skip a bad entry */
+    }
+  }
+  return out;
+}
+
 /** Oldest first. */
 export async function zoldest(key: string, n: number): Promise<string[]> {
   if (redis) return ((await redis.zrange(key, 0, n - 1)) as unknown[]).map(String);
