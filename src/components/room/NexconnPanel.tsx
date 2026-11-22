@@ -10,7 +10,7 @@ const FEATURES = [
   { k: "High-priority messages", d: "Lock and result cards cut through the chatter (priority 2)" },
   { k: "Channel metadata", d: "Room phase and score mirrored so late joiners catch up at once" },
   { k: "Participant events", d: "Live head count from onParticipantChanged" },
-  { k: "Pre-messaging webhook", d: "Betting spam is refused before delivery; every phone also hides rule-breaking lines and forged cards" },
+  { k: "Webhooks + delete", d: "The message:send webhook deletes betting spam and forged cards for everyone; every phone also refuses and hides rule-breaking lines" },
   { k: "Mute", d: "The host can mute a participant in the room" },
   { k: "Server API", d: "Signed calls with failover to the backup domain" },
 ];

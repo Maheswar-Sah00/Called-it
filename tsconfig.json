@@ -38,6 +38,7 @@
     ".next-film/types/**/*.ts"
   ],
   "exclude": [
+    "tests",
     "node_modules"
   ]
 }
