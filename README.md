@@ -45,7 +45,7 @@ Built on the **Nexconn Chat SDK** for the **Nexconn Build Challenge 2026** · Tr
 - **Who it's for:** friends, hostel floors and fan clubs who watch the same live match apart (a phone on the bus, a laptop at home, the hostel TV) and talk in a group chat.
 - **What goes wrong today:** every stream runs at its own delay, so the group chat spoils every wicket and goal for whoever is behind, and "I called it!" is always typed after the fact, with no proof.
 - **What Called It does:** one friend hosts a room for a **real live match** (the room follows its live score) and shares one link. Before each big moment the host asks "Next ball?"; everyone taps a call; **the server locks calls at the moment of play** (a late tap is refused and told by how much); the result settles points, streaks and the table. A **spoiler shield** holds results and chat until each person's stream catches up.
-- **Why Nexconn:** the whole game is the chat room. Every moment, lock, tally and result is a Nexconn message, the live score reaches every phone through Nexconn channel metadata, and spam is stopped before delivery. [Nine Nexconn features, mapped to code](#why-this-only-works-on-nexconn).
+- **Why Nexconn:** the whole game is the chat room. Every moment, lock, tally and result is a Nexconn message, the live score reaches every phone through Nexconn channel metadata, and spam is refused in the app and deleted from the room by our server through a Nexconn webhook. [Nine Nexconn features, mapped to code](#why-this-only-works-on-nexconn).
 - **Proof it's real:** deployed at [called-it-inky.vercel.app](https://called-it-inky.vercel.app), playable with no sign-up, following matches that are live right now across cricket, NBA, NHL, F1, football and tennis, with [8 automated tests](#tests-and-quality) for the rules that keep it fair.
 
 ## Judges: start here (3 minutes)
@@ -64,9 +64,9 @@ Built on the **Nexconn Chat SDK** for the **Nexconn Build Challenge 2026** · Tr
 | Criterion (weight) | What we built | Check it here |
 |---|---|---|
 | **Completeness and user experience (50%)** | A finished product, not a prototype: deployed; no sign-up; works on phone and laptop; day and night themes; ten sports (live score feeds for six of them); host controls; spoiler shield; reconnects; empty, error and 404 states; a 3-minute judge demo with labelled bots. | [Live app](https://called-it-inky.vercel.app) · [Screens](#the-app-screen-by-screen) · [Tests](#tests-and-quality) |
-| **Innovation in a real communication problem (30%)** | Group chats during live sport break in two ways: different stream delays spoil the moment, and predictions have no proof. Called It fixes both inside one chat room: server-locked calls give the proof, a per-person spoiler shield holds results and chat, and spam and forged result cards are stopped before they are delivered. | [The problem](#the-problem) · [How one call works](#how-one-call-works) |
+| **Innovation in a real communication problem (30%)** | Group chats during live sport break in two ways: different stream delays spoil the moment, and predictions have no proof. Called It fixes both inside one chat room: server-locked calls give the proof, a per-person spoiler shield holds results and chat, and spam and forged result cards never reach the room (refused in the app, deleted by the server through a Nexconn webhook). | [The problem](#the-problem) · [How one call works](#how-one-call-works) |
 | **Business potential and traction (20%)** | A room is free to start and spreads by its own invite link (every host brings their friends). There is a public live counter of people, rooms and calls on our Nexconn App Key, and the product is clear for sponsors, leagues and creators. | [/impact](https://called-it-inky.vercel.app/impact) · [Traction and business](#traction-and-business) |
-| **Nexconn SDK at the core** | Open channels, custom message types, priority messages, channel metadata, participant events, messages and reactions, pre-messaging and message:send webhooks, mute and message delete, the signed Server API with failover. | [Why this only works on Nexconn](#why-this-only-works-on-nexconn) |
+| **Nexconn SDK at the core** | Open channels, custom message types, priority messages, channel metadata, participant events, messages and reactions, the message:send webhook (pre-messaging handler ready), mute and message delete, the signed Server API with failover. | [Why this only works on Nexconn](#why-this-only-works-on-nexconn) |
 
 ## The problem
 
@@ -167,8 +167,8 @@ Called It *is* a chat room: the game state travels as chat messages. Remove Nexc
 | **Channel metadata** | The room's phase and the **live score**, written only when they change; every client updates from `onMetadataChanged`, and late joiners catch up at once. | `setRoomMetadata`, [`src/lib/server/rooms.ts`](src/lib/server/rooms.ts) |
 | **Participant events** | The live head count from `onParticipantChanged`. | [`src/lib/client/live.ts`](src/lib/client/live.ts) |
 | **Messages and reactions** | Room chat and sticker reactions through the message handler; the spoiler shield delays them per person. | [`src/components/room/Room.tsx`](src/components/room/Room.tsx) |
-| **Pre-messaging webhook** | `open_channel:pre_messaging` calls our [`/api/webhook`](src/app/api/webhook/route.ts), which answers `pass: 0` for betting spam, links, phone numbers, off-app invites and forged CI cards, so they are never delivered. | [`src/app/api/webhook/route.ts`](src/app/api/webhook/route.ts) |
-| **message:send webhook, mute, delete** | A second check deletes anything that slipped through for everyone; the host can mute a player (everyone sees `onParticipantMuted`). | `muteInRoom`, `deleteRoomMessage` |
+| **Webhooks + message delete** | `message:send` calls our [`/api/webhook`](src/app/api/webhook/route.ts) for every room message; anything that breaks the room rules (betting spam, links, phone numbers, off-app invites, forged CI cards) is deleted for everyone through the Server API and counted on `/impact`. The same handler already answers `open_channel:pre_messaging` with `pass: 0` to refuse before delivery; that event is greyed out on our Free plan in the Console, so it switches on when the plan allows. | [`src/app/api/webhook/route.ts`](src/app/api/webhook/route.ts), `deleteRoomMessage` |
+| **Mute** | The host can mute a player for 10 minutes through the Server API; everyone sees `onParticipantMuted`. | `muteInRoom` |
 | **Server API** | SHA1-signed calls (token issue, channel create, send, metadata, mute, delete) with automatic failover to the backup domain. | [`src/lib/server/nexconn.ts`](src/lib/server/nexconn.ts) |
 | **Call SDK (next)** | Voice and video huddles inside the room. The code is in the repo ([`Huddle.tsx`](src/components/room/Huddle.tsx), [`huddle.ts`](src/lib/client/huddle.ts)) behind `CALLS_ENABLED`, switched on once Call is enabled on our plan. | [`src/lib/game.ts`](src/lib/game.ts) |
 
@@ -184,7 +184,7 @@ Called It *is* a chat room: the game state travels as chat messages. Remove Nexc
   - API routes for session, rooms, live matches, the webhook and impact
   - the room engine: open, call, lock, settle, the replay clock and score sync
   - a signed **Nexconn Server API** client that fails over to a backup host
-- **What the server sends and gets.** It sends tokens, channel setup, `CI:*` cards at priority 2, metadata and mutes through the Server API. It receives the `pre_messaging` and `message:send` webhooks.
+- **What the server sends and gets.** It sends tokens, channel setup, `CI:*` cards at priority 2, metadata and mutes through the Server API. It receives the `message:send` webhook (and is ready for `pre_messaging`).
 - **Upstash Redis** holds room state and the table, the atomic Lua lock (`callIfOpen`), leases and rate limits.
 - **ESPN public scoreboard** supplies live scores, cached for 30 s and shared across server instances.
 - **Next:** the dashed box is Nexconn Call SDK voice and video huddles.
@@ -214,17 +214,20 @@ Editable sources for every diagram are in [`docs/diagrams/`](docs/diagrams/) as 
 
 ## How the room stays clean
 
-![Moderation: a chat message is held by Nexconn, checked by our pre-messaging webhook, refused with pass 0 or delivered with pass 1; message:send re-checks; the host can mute](docs/diagrams/moderation-flow.svg)
+![Moderation: a chat message is checked by our webhook; refused with pass 0 or delivered with pass 1; message:send re-checks and deletes; the host can mute](docs/diagrams/moderation-flow.svg)
 
-A chat message is held by Nexconn and checked by our webhook before delivery. The checks are:
+Every message meets the same rules ([`BLOCK_PATTERNS`](src/lib/game.ts)) three times:
+1. **In the sender's app, before it is sent.** A hit is refused on the spot ("Betting talk is blocked. It won't be delivered."), so it never reaches the room.
+2. **In every receiver's app.** Game cards from anyone but our server bot are ignored, and text that breaks the rules is hidden.
+3. **On our server, through the Nexconn `message:send` webhook.** Anything that got past a modified client is deleted for everyone through the Server API and counted on `/impact`.
+
+The diagram shows the full design, including Nexconn's synchronous `open_channel:pre_messaging` hook, which our handler already supports (`pass: 0` refuses before delivery). That event is greyed out on our Free plan in the Console, so today steps 1 to 3 do the job. The server-side checks are:
 - Is the request really signed by Nexconn?
 - Is it a game card (CI:*) sent by anyone other than our bot?
 - Does it contain a link or a phone number?
 - Does it contain betting words or an off-app invite?
 
-Any hit returns `pass: 0`: the message is never delivered and is counted on `/impact`. A clean message returns `pass: 1`. The `message:send` webhook re-checks and deletes anything that slipped through, and the host can mute a player.
-
-The same rules ([`BLOCK_PATTERNS`](src/lib/game.ts)) also run in the app before a message is sent, so spam is caught even before the webhook. To use the webhook on your own deployment, set it in the Nexconn Console: URL `https://<your host>/api/webhook`, events `open_channel:pre_messaging` and `message:send`.
+Any hit is deleted (with `message:send`) or refused before delivery (with `pre_messaging`, where the plan has it). The host can also mute a player. To use the webhook on your own deployment, set it in the Nexconn Console: URL `https://<your host>/api/webhook`, event `message:send` (plus `open_channel:pre_messaging` if your plan offers it).
 
 ## Fair by construction
 
@@ -232,7 +235,7 @@ The model is simple: **the host proposes, the server's code decides, and everyon
 
 - **Atomic lock.** A Redis Lua script ([`callIfOpen`](src/lib/server/store.ts)) accepts a call only while the moment is open and the server time is before its lock time. Changing your pick before the lock is allowed; after it, nothing gets in.
 - **Only the host** opens, locks and settles a moment, and the host cannot call their own moment.
-- **Only the server** may send game cards. A result card typed by a player is refused before delivery and ignored by every client.
+- **Only the server** may send game cards. A result card sent by a player is ignored by every client and deleted by the server.
 - **Points only.** No wallets, stakes or payments anywhere. Betting words, links and phone numbers are blocked in chat.
 - **Abuse limits.** Rate limits shared through Redis, a cross-site POST guard, signed session cookies and webhook signature checks with a 5-minute replay window.
 - **Demo bots are honest.** They exist only in `/try` rooms, are labelled BOT in the UI, never get Nexconn tokens and are excluded from every traction number.
@@ -319,7 +322,7 @@ npm test                     # 8 tests, no network needed
 | `NEXT_PUBLIC_NEXCONN_AREA` | Client data center code (this app: `NA`) |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Room state. Without them an in-memory store is used (one server only) |
 
-In the Nexconn Console, point the webhook at `https://<your host>/api/webhook` with the events `open_channel:pre_messaging` and `message:send`.
+In the Nexconn Console, point the webhook at `https://<your host>/api/webhook` with the event `message:send` (and `open_channel:pre_messaging` if your plan offers it).
 
 ## Project structure
 
