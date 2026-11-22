@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Excalidraw diagram renderer</title>
+</head>
+<body>
+<script>
+  // Fonts for the SVG export are fetched (and subset + inlined) from the pinned package.
+  window.EXCALIDRAW_ASSET_PATH = "https://unpkg.com/@excalidraw/excalidraw@0.18.0/dist/prod/";
+</script>
+<script type="module">
+  import * as EX from "https://esm.sh/@excalidraw/excalidraw@0.18.0?deps=react@19.0.0,react-dom@19.0.0";
+
+  const FONT_BASE = "https://unpkg.com/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/";
+  // Excalifont (Latin subset) so text is measured with the real hand font before layout.
+  const face = new FontFace(
+    "Excalifont",
+    `url(${FONT_BASE}Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2)`,
+    { unicodeRange: "U+20-7e,U+a0-ff,U+2013-2014,U+2018-201e,U+2022,U+2026,U+2212" },
+  );
+  document.fonts.add(face);
+  await face.load();
+  await document.fonts.ready;
+
+  const appState = {
+    exportBackground: true,
+    viewBackgroundColor: "#ffffff",
+    exportWithDarkMode: false,
+    gridSize: null,
+  };
+
+  async function blobToBase64(blob) {
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    let s = "";
+    for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+
+  window.measure = (text, fontSize) => {
+    const c = document.createElement("canvas").getContext("2d");
+    c.font = `${fontSize}px Excalifont`;
+    return c.measureText(text).width;
+  };
+
+  window.renderScene = async (skeleton, padding = 40, scale = 2) => {
+    const elements = EX.convertToExcalidrawElements(skeleton, { regenerateIds: false });
+    const json = EX.serializeAsJSON(elements, { ...appState }, {}, "local");
+    const svg = await EX.exportToSvg({ elements, appState: { ...appState }, files: null, exportPadding: padding });
+    const blob = await EX.exportToBlob({
+      elements,
+      appState: { ...appState },
+      files: null,
+      exportPadding: padding,
+      mimeType: "image/png",
+      getDimensions: (w, h) => ({ width: w * scale, height: h * scale, scale }),
+    });
+    return { json, svg: svg.outerHTML, png: await blobToBase64(blob) };
+  };
+  window.__ready = true;
+</script>
+</body>
+</html>
