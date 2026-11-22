@@ -1,6 +1,6 @@
 import { createRoom } from "@/lib/server/rooms";
 import { readSession } from "@/lib/server/session";
-import { fail, limited, ok, readBody, str } from "@/lib/server/http";
+import { clientIp, crossSite, fail, limited, ok, readBody, str } from "@/lib/server/http";
 import { SPORTS, type Sport } from "@/lib/game";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const s = await readSession();
   if (!s) return fail(401, "Join with a nickname first");
-  if (limited(`room:${s.userId}`, 6, 60_000)) return fail(429, "Slow down: too many rooms");
+  if (crossSite(req)) return fail(403, "Open Called It directly to make a room");
+  if (await limited(`room:${s.userId}`, 6, 60_000)) return fail(429, "Slow down: too many rooms");
+  if (await limited(`roomip:${clientIp(req)}`, 15, 10 * 60_000)) return fail(429, "Too many new rooms from here. Reuse your room link");
   const body = (await readBody(req)) as {
     name?: string;
     sport?: Sport;

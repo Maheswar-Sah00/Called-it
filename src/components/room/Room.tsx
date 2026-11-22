@@ -153,10 +153,29 @@ export function Room({ id }: { id: string }) {
     fetchState();
   }, [fetchState]);
 
-  // poll as a safety net; the live channel does the real work
+  // poll as a safety net; the live channel does the real work.
+  // Hidden tabs poll once a minute (keeps the room alive, spares the quota); catch up on return.
   useEffect(() => {
-    const t = setInterval(fetchState, liveStatus === "live" ? 5000 : 1500);
-    return () => clearInterval(t);
+    let last = 0;
+    const tick = () => {
+      const every = document.hidden ? 60_000 : liveStatus === "live" ? 10_000 : 2500;
+      if (Date.now() - last >= every - 50) {
+        last = Date.now();
+        fetchState();
+      }
+    };
+    const t = setInterval(tick, 2500);
+    const onVis = () => {
+      if (!document.hidden) {
+        last = Date.now();
+        fetchState();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [fetchState, liveStatus]);
 
   // real-match rooms: nudge the server to check the feed; any change arrives as a metadata push

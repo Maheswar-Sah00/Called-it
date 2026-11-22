@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import { hit } from "./store";
 
 export function ok(data: unknown, init?: number) {
   return NextResponse.json(data, { status: init ?? 200, headers: { "Cache-Control": "no-store" } });
@@ -9,17 +10,36 @@ export function fail(status: number, error: string, extra?: Record<string, unkno
   return NextResponse.json({ error, ...extra }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-/** Simple fixed-window rate limit per key, in memory per instance (good enough to stop floods). */
-const buckets = new Map<string, { n: number; reset: number }>();
-export function limited(key: string, max: number, windowMs: number) {
-  const now = Date.now();
-  const b = buckets.get(key);
-  if (!b || b.reset < now) {
-    buckets.set(key, { n: 1, reset: now + windowMs });
+/**
+ * Fixed-window rate limit shared across all serverless instances (Redis).
+ * Fails open if the store hiccups: a limiter must never take the app down.
+ */
+export async function limited(key: string, max: number, windowMs: number): Promise<boolean> {
+  try {
+    return (await hit(`rl:${key}`, windowMs)) > max;
+  } catch {
     return false;
   }
-  b.n++;
-  return b.n > max;
+}
+
+/** The caller's IP as Vercel sees it. */
+export function clientIp(req: Request) {
+  return req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+}
+
+/**
+ * Refuse cross-site POSTs. A browser always sends Origin on a cross-site POST,
+ * so another page can't create sessions or rooms from its visitors' browsers.
+ */
+export function crossSite(req: Request) {
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
 }
 
 /** Parse a JSON body into a plain object; anything else (null, array, number, bad JSON) becomes {}. */

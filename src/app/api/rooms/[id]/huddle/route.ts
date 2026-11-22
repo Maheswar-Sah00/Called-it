@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const s = await readSession();
   if (!s) return fail(401, "Join with a nickname first");
-  if (limited(`huddle:${s.userId}`, 10, 60_000)) return fail(429, "Slow down");
+  if (await limited(`huddle:${s.userId}`, 10, 60_000)) return fail(429, "Slow down");
   const room = await getRoom(id);
   if (!room) return fail(404, "Room not found");
   if (!(await isMember(id, s.userId))) return fail(403, "Join the room first");

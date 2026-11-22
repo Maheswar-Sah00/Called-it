@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const s = await readSession();
   if (!s) return fail(401, "Join with a nickname first");
-  if (limited(`call:${s.userId}`, 30, 10_000)) return fail(429, "Easy there");
+  if (await limited(`call:${s.userId}`, 30, 10_000)) return fail(429, "Easy there");
   const room = await getRoom(id);
   if (!room) return fail(404, "Room not found");
   if (room.mode === "host" && room.hostId === s.userId) return fail(403, "The host calls the result, not the moment");

@@ -48,6 +48,7 @@ export async function readSession(): Promise<Session | null> {
 
 export function cleanName(name: unknown): string | null {
   if (typeof name !== "string") return null;
-  const n = name.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 24);
+  // Drop control and invisible format characters (zero-width, bidi overrides), cut by whole characters.
+  const n = Array.from(name.replace(/[\p{Cc}\p{Cf}<>]/gu, "").replace(/\s+/g, " ").trim()).slice(0, 24).join("").trim();
   return n.length >= 1 ? n : null;
 }

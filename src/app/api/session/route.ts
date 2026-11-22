@@ -1,6 +1,6 @@
 import { appKey, issueToken } from "@/lib/server/nexconn";
 import { cleanName, newUserId, readSession, writeSession } from "@/lib/server/session";
-import { fail, limited, ok, readBody, str } from "@/lib/server/http";
+import { clientIp, crossSite, fail, limited, ok, readBody } from "@/lib/server/http";
 import { sadd } from "@/lib/server/store";
 import { AVATARS } from "@/lib/game";
 
@@ -16,8 +16,9 @@ export async function GET() {
 
 /** Join with a nickname. No sign-up: the server mints an id and a Nexconn token. */
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "local";
-  if (limited(`session:${ip}`, 20, 60_000)) return fail(429, "Too many joins, try again in a minute");
+  if (crossSite(req)) return fail(403, "Open Called It directly to join");
+  const ip = clientIp(req);
+  if (await limited(`session:${ip}`, 20, 60_000)) return fail(429, "Too many joins, try again in a minute");
   const body = (await readBody(req)) as { name?: string; demo?: boolean; avatar?: string };
   const avatar = (AVATARS as readonly string[]).includes(body.avatar ?? "") ? body.avatar : "student";
   const name = cleanName(body.name);

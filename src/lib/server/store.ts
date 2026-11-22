@@ -119,6 +119,16 @@ export async function zadd(key: string, member: string, score: number) {
   mem.kv.set(key, z);
 }
 
+/** Update a member's score only if it is already in the set (never re-adds a recycled channel). */
+export async function ztouch(key: string, member: string, score: number) {
+  if (redis) return void (await redis.zadd(key, { xx: true }, { score, member }));
+  const z = (memGet<Record<string, number>>(key) ?? {}) as Record<string, number>;
+  if (member in z) {
+    z[member] = score;
+    mem.kv.set(key, z);
+  }
+}
+
 /** Oldest first. */
 export async function zoldest(key: string, n: number): Promise<string[]> {
   if (redis) return ((await redis.zrange(key, 0, n - 1)) as unknown[]).map(String);
@@ -140,6 +150,41 @@ export async function zrem(key: string, ...members: string[]) {
 export async function zcount(key: string): Promise<number> {
   if (redis) return Number(await redis.zcard(key));
   return Object.keys((memGet<Record<string, number>>(key) ?? {}) as Record<string, number>).length;
+}
+
+/** Members whose score is at or below maxScore, oldest first (idle channels). */
+export async function zolder(key: string, maxScore: number, n: number): Promise<string[]> {
+  if (redis) return ((await redis.zrange(key, "-inf", maxScore, { byScore: true, offset: 0, count: n })) as unknown[]).map(String);
+  const z = (memGet<Record<string, number>>(key) ?? {}) as Record<string, number>;
+  return Object.entries(z)
+    .filter(([, sc]) => sc <= maxScore)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, n)
+    .map(([m]) => m);
+}
+
+export async function zscore(key: string, member: string): Promise<number | null> {
+  if (redis) {
+    const v = await redis.zscore(key, member);
+    return v === null || v === undefined ? null : Number(v);
+  }
+  const z = (memGet<Record<string, number>>(key) ?? {}) as Record<string, number>;
+  return member in z ? z[member] : null;
+}
+
+const HIT_SCRIPT = `local n = redis.call('INCR', KEYS[1]) if n == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end return n`;
+
+/** Fixed-window counter shared by every serverless instance. Returns the count in this window. */
+export async function hit(key: string, windowMs: number): Promise<number> {
+  if (redis) return Number(await redis.eval(HIT_SCRIPT, [key], [String(windowMs)]));
+  const now = Date.now();
+  const b = memGet<{ n: number; reset: number }>(key);
+  if (!b || b.reset < now) {
+    mem.kv.set(key, { n: 1, reset: now + windowMs });
+    return 1;
+  }
+  b.n++;
+  return b.n;
 }
 
 export async function scard(key: string): Promise<number> {
@@ -170,7 +215,7 @@ export async function release(key: string, token: string | null) {
 /**
  * THE LOCK. Accept (or change) a user's call only if this moment is still open
  * and the server clock is before the lock time. Runs atomically.
- * Returns "ok", "locked" or "stale".
+ * Returns "ok" (first call), "changed" (switched pick), "locked" or "stale".
  */
 const CALL_SCRIPT = `
 local state = redis.call('HGET', KEYS[1], 'state')
@@ -179,8 +224,10 @@ local lockAt = tonumber(redis.call('HGET', KEYS[1], 'lockAt') or '0')
 if mid ~= ARGV[1] then return 'stale' end
 if state ~= 'open' then return 'locked' end
 if lockAt > 0 and tonumber(ARGV[4]) >= lockAt then return 'locked' end
+local had = redis.call('HEXISTS', KEYS[2], ARGV[2])
 redis.call('HSET', KEYS[2], ARGV[2], ARGV[3])
 redis.call('EXPIRE', KEYS[2], 1209600)
+if had == 1 then return 'changed' end
 return 'ok'
 `;
 
@@ -191,10 +238,11 @@ export async function callIfOpen(
   userId: string,
   payload: string,
   now: number,
-): Promise<"ok" | "locked" | "stale"> {
+): Promise<"ok" | "changed" | "locked" | "stale"> {
   if (redis) {
     return (await redis.eval(CALL_SCRIPT, [momentKey, callsKey], [mid, userId, payload, String(now)])) as
       | "ok"
+      | "changed"
       | "locked"
       | "stale";
   }
@@ -203,9 +251,10 @@ export async function callIfOpen(
   if (m.state !== "open") return "locked";
   if (Number(m.lockAt || 0) > 0 && now >= Number(m.lockAt)) return "locked";
   const c = (memGet<Record<string, string>>(callsKey) ?? {}) as Record<string, string>;
+  const had = userId in c;
   c[userId] = payload;
   mem.kv.set(callsKey, c);
-  return "ok";
+  return had ? "changed" : "ok";
 }
 
 /** Replace the whole moment hash (host actions are serialised by the room lease). */

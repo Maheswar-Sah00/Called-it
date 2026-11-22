@@ -30,9 +30,13 @@ import {
   setMoment,
   zincr,
   zadd,
+  zcount,
   zoldest,
+  zolder,
   zrem,
+  zscore,
   ztop,
+  ztouch,
 } from "./store";
 import { findMatch, scoreLine } from "./live";
 import { BOT_AVATARS, BOT_NAMES, botCall, botLine } from "./bots";
@@ -97,17 +101,7 @@ export async function createRoom(opts: {
     createdAt: Date.now(),
     match: opts.match ?? null,
   };
-  // Demo rooms close after 60 idle minutes (Nexconn's minimum); real rooms after a day.
-  const ttl = opts.demo ? 60 : 1440;
-  const meta = { phase: "waiting", room: opts.name };
-  let r = await createOpenChannel(channelId, meta, ttl);
-  if (r.code !== 0) {
-    // Free plan: 50 open channels at once. Recycle the oldest demo channels, then retry once.
-    const freed = await recycleDemoChannels(6);
-    if (freed > 0) r = await createOpenChannel(channelId, meta, ttl);
-  }
-  if (r.code !== 0) throw new Error(`open channel create failed: ${r.code} ${r.errorMessage ?? ""}`);
-  await zadd(opts.demo ? CH_DEMO : CH_REAL, channelId, Date.now());
+  const r = await openChannel(channelId, opts.name, opts.demo);
   await setJSON(K.room(id), room);
   await rememberName(id, opts.hostId, opts.hostName, opts.hostAvatar);
   if (opts.mode === "replay") {
@@ -126,13 +120,59 @@ export async function createRoom(opts: {
 export const CH_DEMO = "nx:channels:demo";
 export const CH_REAL = "nx:channels:real";
 
-/** Close the oldest demo channels to free Free-plan slots. Returns how many were closed. */
-export async function recycleDemoChannels(n: number) {
-  const oldest = await zoldest(CH_DEMO, n);
-  if (!oldest.length) return 0;
-  await destroyOpenChannels(oldest).catch(() => null);
-  await zrem(CH_DEMO, ...oldest);
-  return oldest.length;
+// Free plan: at most 50 open channels at once. We keep headroom and recycle idle ones.
+const CHANNEL_SOFT_CAP = 44;
+const DEMO_IDLE_MS = 10 * 60_000; // a replay demo lasts about 3 minutes
+const REAL_IDLE_MS = 30 * 60_000; // open tabs touch their room at least once a minute
+
+/**
+ * Free channel slots: idle demo channels first, then real rooms nobody has
+ * looked at for 30 minutes (their room record stays; the channel is recreated
+ * if anyone comes back). As a last resort, the oldest demo channels.
+ */
+export async function freeChannelSlots(n: number) {
+  const now = Date.now();
+  const demo = await zolder(CH_DEMO, now - DEMO_IDLE_MS, n);
+  const real = demo.length < n ? await zolder(CH_REAL, now - REAL_IDLE_MS, n - demo.length) : [];
+  const forced = demo.length + real.length === 0 ? await zoldest(CH_DEMO, Math.min(n, 3)) : [];
+  const all = [...demo, ...forced, ...real];
+  if (!all.length) return 0;
+  await destroyOpenChannels(all).catch(() => null);
+  if (demo.length + forced.length) await zrem(CH_DEMO, ...demo, ...forced);
+  if (real.length) await zrem(CH_REAL, ...real);
+  return all.length;
+}
+
+/** Back-compat name used elsewhere. */
+export const recycleDemoChannels = freeChannelSlots;
+
+/** Create (or recreate) a room's Nexconn open channel, making room under the Free-plan cap first. */
+async function openChannel(channelId: string, roomName: string, demo: boolean) {
+  // Demo rooms close after 60 idle minutes (Nexconn's minimum); real rooms after a day.
+  const ttl = demo ? 60 : 1440;
+  const meta = { phase: "waiting", room: roomName };
+  const inUse = (await zcount(CH_DEMO)) + (await zcount(CH_REAL));
+  if (inUse >= CHANNEL_SOFT_CAP) await freeChannelSlots(inUse - CHANNEL_SOFT_CAP + 3);
+  let r = await createOpenChannel(channelId, meta, ttl);
+  if (r.code !== 0) {
+    const freed = await freeChannelSlots(6);
+    if (freed > 0) r = await createOpenChannel(channelId, meta, ttl);
+  }
+  if (r.code !== 0) throw new Error(`open channel create failed: ${r.code} ${r.errorMessage ?? ""}`);
+  await zadd(demo ? CH_DEMO : CH_REAL, channelId, Date.now());
+  return r;
+}
+
+/** Someone is in this room: keep its channel off the recycling list. */
+export async function touchRoom(room: RoomPublic) {
+  await ztouch(room.demo ? CH_DEMO : CH_REAL, room.channelId, Date.now());
+}
+
+/** If this room's channel was recycled while idle, open a fresh one before anyone enters it. */
+export async function ensureChannel(room: RoomPublic) {
+  const set = room.demo ? CH_DEMO : CH_REAL;
+  if ((await zscore(set, room.channelId)) !== null) return touchRoom(room);
+  await openChannel(room.channelId, room.name, room.demo);
 }
 
 export async function getRoom(id: string) {
@@ -166,7 +206,7 @@ async function tallyOf(roomId: string, mid: string, options: Option[]): Promise<
 export async function roomState(roomId: string, userId: string | null): Promise<RoomState | null> {
   const room = await getRoom(roomId);
   if (!room) return null;
-  const m = await hgetall(K.moment(roomId));
+  const [m] = await Promise.all([hgetall(K.moment(roomId)), touchRoom(room)]);
   let moment: RoomState["moment"] = null;
   let tally: TallyCard | null = null;
   let myCall: string | null = null;
@@ -247,14 +287,15 @@ export async function placeCall(room: RoomPublic, userId: string, mid: string, o
   const card = JSON.parse(m.card) as MomentCard;
   if (!card.options.some((o) => o.id === optionId)) return { status: "bad" as const };
   const status = await callIfOpen(K.moment(room.id), K.calls(room.id, mid), mid, userId, optionId, now);
-  if (status === "ok") {
+  if (status === "ok" || status === "changed") {
     const t = await tallyOf(room.id, mid, card.options);
     void sendToRoom(room.channelId, MT.Tally, t, { persist: false });
-    if (!room.demo) {
+    // Count a call once per person per moment; switching your pick isn't a new call.
+    if (!room.demo && status === "ok") {
       await incr("impact:calls");
       await sadd("impact:callers", userId);
     }
-    return { status, tally: t };
+    return { status: "ok" as const, tally: t };
   }
   return { status, lockAt: Number(m.lockAt) || Date.now() };
 }
