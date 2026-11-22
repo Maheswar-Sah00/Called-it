@@ -369,7 +369,7 @@ docs/
 
 ## Demo video
 
-**[Watch the demo (2 min)](#demo-video)**: the real app in use, three friends in one room, a live Test match score ticking inside the room, and the Nexconn features behind each moment.
+**[Watch the demo (3 min)](#demo-video)**: the real app in use, recorded live: matches on air across six sports, three friends in one room, a live Test match score ticking inside the room, calls locked at the ball, a ball-by-ball replay of the 2024 T20 World Cup final, and the Nexconn features behind each moment.
 
 ---
 
