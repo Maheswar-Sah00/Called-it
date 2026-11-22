@@ -9,9 +9,9 @@ Nexconn App Key: `m7ua80gbmcxbm`.
 
 ## Judges: start here
 
-1. Open the live app: **[LIVE URL]**
-2. Tap **Try the 60-second demo** (`/try`). Pick a nickname: no sign-up.
-3. You are dropped into a replay of the last five overs of the **2024 T20 World Cup final**, ball by ball from Cricsheet
+1. Open the live app: **https://called-it-inky.vercel.app**
+2. Tap **Try the 3-minute demo** (`/try`). Pick a nickname: no sign-up.
+3. You are dropped into a replay of the last three overs of the **2024 T20 World Cup final**, ball by ball from Cricsheet
    data, with five demo friends marked BOT. Call each ball before it is bowled. Try tapping late: the server refuses it
    and tells you by how much.
 4. Open **Nexconn inside** (bottom left on a laptop, the Table tab on a phone) to watch the live SDK log.
